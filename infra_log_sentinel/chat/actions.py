@@ -33,7 +33,7 @@ from infra_log_sentinel.state.runtime_control import (
 DOMAINS = ("network", "linux", "windows", "vmware")
 SEVERITIES = ("critical", "error", "warning", "info")
 SEVERITY_ORDER = {"critical": 0, "error": 1, "warning": 2, "info": 3}
-CHANGE_TERMS = ("doi", "set", "edit", "change", "cap nhat", "thanh", "to", "cau hinh")
+CHANGE_TERMS = ("doi", "set", "edit", "change", "cap nhat", "thanh", "cau hinh")
 
 
 @dataclass(frozen=True)
@@ -95,6 +95,11 @@ def try_execute_chat_action(
 
 def _detect_action(question: str) -> str | None:
     q = _normalize(question)
+    if _looks_like_assistant_correction(q):
+        return None
+    if _looks_like_informational_log_question(q):
+        return None
+
     if any(term in q for term in ["control status", "trang thai control", "trang thai pause", "pause status"]):
         return "control_status"
     if _looks_like_interval_update(q):
@@ -122,6 +127,74 @@ def _detect_action(question: str) -> str | None:
     if any(term in q for term in ["bao cao", "report", "pdf", "xuat bao cao", "tao bao cao"]):
         return "report"
     return None
+
+
+def _looks_like_assistant_correction(q: str) -> bool:
+    correction_terms = (
+        "khong phai yeu cau",
+        "khong yeu cau",
+        "toi khong yeu cau",
+        "khong de cap den viec thay doi",
+        "khong de cap viec thay doi",
+        "trong cau hoi tren khong de cap",
+        "cau hoi tren khong de cap",
+        "cau hoi truoc khong de cap",
+        "ban dang khong hieu",
+        "agent dang khong hieu",
+        "bot dang khong hieu",
+    )
+    return any(term in q for term in correction_terms)
+
+
+def _looks_like_informational_log_question(q: str) -> bool:
+    has_log_scope = (
+        "log" in q
+        or "alert" in q
+        or "event" in q
+        or any(domain in q for domain in DOMAINS)
+        or any(severity in q for severity in SEVERITIES)
+    )
+    if not has_log_scope:
+        return False
+
+    explicit_delivery_or_export = (
+        "pdf" in q
+        or "csv" in q
+        or "excel" in q
+        or "gmail" in q
+        or "email" in q
+        or "mail" in q
+        or "xuat bao cao" in q
+        or "tao bao cao" in q
+        or "gui bao cao" in q
+        or "send report" in q
+        or "export" in q
+        or "xuat file" in q
+    )
+    if explicit_delivery_or_export:
+        return False
+
+    info_terms = (
+        "tom tat",
+        "summary",
+        "tong quan",
+        "bao nhieu",
+        "count",
+        "co",
+        "khong",
+        "nao",
+        "phan tich",
+        "uu tien",
+        "can xem",
+        "command",
+        "lenh",
+        "xu ly",
+        "nguyen nhan",
+        "cause",
+        "impact",
+        "tac dong",
+    )
+    return any(term in q for term in info_terms)
 
 
 def _events_for_action(settings: Settings, events: list[LogEvent], question: str) -> list[LogEvent]:
@@ -262,17 +335,72 @@ def _control_status(settings: Settings) -> str:
         VALUE_DEMO_LOG_INTERVAL_SECONDS,
         settings.demo_log_interval_seconds,
     )
-    states = [
-        store.pause_state(CONTROL_TELEGRAM_ALERTS),
-        store.pause_state(CONTROL_EMAIL_REPORTS),
-        store.pause_state(CONTROL_LOG_GENERATION),
-    ]
+    telegram_pause = store.pause_state(CONTROL_TELEGRAM_ALERTS)
+    email_pause = store.pause_state(CONTROL_EMAIL_REPORTS)
+    loggen_pause = store.pause_state(CONTROL_LOG_GENERATION)
+    delivery_state, delivery_detail = _telegram_alert_delivery_state(
+        settings,
+        paused=telegram_pause.paused,
+        manual_off=bool(telegram_pause.paused_until and telegram_pause.paused_until.year >= 9999),
+    )
     lines = [
         "Runtime control status:",
-        *(f"- {state.as_text()}" for state in states),
+        f"- telegram_alert_pause: {telegram_pause.as_text()}",
+        f"- telegram_alert_delivery: {delivery_state}",
+        f"- scheduler_worker: {'enabled' if settings.runtime_scheduler_enabled else 'disabled'}",
+        f"- delivery_mode: {'dry_run' if settings.runtime_scheduler_dry_run else 'live'}",
+        f"- telegram_config: {'configured' if _telegram_alerts_configured(settings) else 'missing'}",
+        f"- email_reports: {email_pause.as_text()}",
+        f"- log_generation: {loggen_pause.as_text()}",
         f"- demo_log_interval_seconds: {interval:g}",
     ]
+    if delivery_detail:
+        lines.extend(["", f"Note: {delivery_detail}"])
     return "\n".join(lines)
+
+
+def _telegram_alert_delivery_state(settings: Settings, paused: bool, manual_off: bool = False) -> tuple[str, str]:
+    if not _telegram_alerts_configured(settings):
+        return (
+            "misconfigured",
+            "Telegram bot token/chat id is missing or placeholder, so alerts cannot be sent.",
+        )
+    if not settings.runtime_scheduler_enabled:
+        return (
+            "disabled",
+            "Runtime scheduler is off, so realtime alert scans are not running.",
+        )
+    if settings.runtime_scheduler_dry_run:
+        return (
+            "dry_run",
+            "Runtime scheduler is in preview mode, so Telegram alert messages are not sent.",
+        )
+    if paused and manual_off:
+        return (
+            "off",
+            "Telegram alert delivery is off until it is enabled again.",
+        )
+    if paused:
+        return (
+            "paused",
+            "Telegram alert delivery is temporarily paused by runtime control.",
+        )
+    return (
+        "live",
+        "Scheduler is enabled, dry-run is off, config is present, and alert delivery is not paused.",
+    )
+
+
+def _telegram_alerts_configured(settings: Settings) -> bool:
+    return _has_real_secret(settings.telegram_bot_token) and _has_real_secret(settings.telegram_chat_id)
+
+
+def _has_real_secret(value: str) -> bool:
+    return value.strip() not in {
+        "",
+        "replace_with_telegram_bot_token",
+        "replace_with_telegram_chat_id",
+    }
 
 
 def _pause_controls(settings: Settings, question: str, dry_run: bool) -> str:
@@ -509,7 +637,9 @@ def _looks_like_interval_update(q: str) -> bool:
     generator_terms = ["sinh log", "generate log", "generator", "auto log"]
     interval_terms = ["interval", "chu ky", "tan suat", "every", "moi"]
 
-    if any(term in q for term in generator_terms) and any(term in q for term in interval_terms + list(CHANGE_TERMS)):
+    if any(term in q for term in generator_terms) and (
+        any(term in q for term in interval_terms) or _has_change_term(q)
+    ):
         return True
     if "demo_log_interval_seconds" in q and _parse_interval_seconds(q) is not None:
         return True
@@ -524,13 +654,13 @@ def _looks_like_interval_clarification(q: str) -> bool:
         return False
     return (
         any(term in q for term in interval_terms)
-        and any(term in q for term in CHANGE_TERMS)
+        and _has_change_term(q)
         and _parse_interval_seconds(q) is not None
     )
 
 
 def _looks_like_scan_interval_update(q: str) -> bool:
-    if _parse_interval_seconds(q) is None or not any(term in q for term in CHANGE_TERMS):
+    if _parse_interval_seconds(q) is None or not _has_change_term(q):
         return False
     return (
         ("scan" in q and any(term in q for term in ["interval", "chu ky", "tan suat"]))
@@ -540,7 +670,7 @@ def _looks_like_scan_interval_update(q: str) -> bool:
 
 
 def _looks_like_report_schedule_update(q: str) -> bool:
-    if not any(term in q for term in CHANGE_TERMS):
+    if not _has_change_term(q):
         return False
     report_terms = ["report", "bao cao", "gmail", "email", "mail"]
     schedule_terms = ["lich", "schedule", "gio gui", "thoi gian gui", "send time"]
@@ -549,7 +679,7 @@ def _looks_like_report_schedule_update(q: str) -> bool:
 
 
 def _looks_like_operational_change_clarification(q: str) -> bool:
-    if not any(term in q for term in CHANGE_TERMS):
+    if not _has_change_term(q):
         return False
     if any(term in q for term in ["sinh log", "generate log", "generator", "auto log"]):
         return False
@@ -589,6 +719,16 @@ def _looks_like_delivery_clarification(q: str) -> bool:
         return False
     delivery_targets = ["bao cao", "report", "gmail", "mail", "email", "telegram", "alert", "csv", "pdf", "file"]
     return not any(term in q for term in delivery_targets)
+
+
+def _has_change_term(q: str) -> bool:
+    return any(_contains_term(q, term) for term in CHANGE_TERMS)
+
+
+def _contains_term(q: str, term: str) -> bool:
+    if " " in term or "_" in term:
+        return term in q
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", q))
 
 
 def _control_targets(question: str, default_all: bool) -> list[str]:

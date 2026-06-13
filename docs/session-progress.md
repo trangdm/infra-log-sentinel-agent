@@ -1,6 +1,6 @@
 # Session Progress
 
-Last updated: 2026-06-12
+Last updated: 2026-06-13
 
 ## Project
 
@@ -45,10 +45,35 @@ C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent
 - Step 12.6: Implemented report time window and realtime alert cursor. Daily report now uses the last `REPORT_LOOKBACK_HOURS` hours; scheduler alert scan now reads only newly appended log lines.
 - Step 12.7: Implemented synthetic dynamic log generator for realtime validation across Network, Linux, Windows, and VMware.
 - Step 12.8: Implemented safe chat actions. Chat can generate PDF reports, send/dry-run Gmail reports, export CSV, and inspect new logs without consuming the realtime cursor.
+- Step 13-16: Completed GreenNode AgentBase runtime packaging, Docker validation, self-contained runtime demo mode, web console, runtime scheduler controls, and pause/resume controls.
+- Step 17: Added runtime regression tests for AgentBase storage/status request handling and confirmed GreenNode env template ACK keyword encoding.
+- Step 18: Added Telegram chat bridge so operators can ask the agent questions through the configured Telegram chat/channel while preserving ACK handling.
+- Step 18.1: Enabled Telegram chat bridge in local `.env`, initialized the Telegram update cursor, and started the local bridge in the background.
+- Step 18.2: Hardened chat intent routing. Runtime actions are now conservative, common log questions use deterministic log answers before LLM fallback, and `Tóm tắt log hôm nay` is covered by regression tests.
+- Step 18.3: Added Telegram-specific professional response formatting with HTML cards, severity heatmap, domain distribution, priority queue, ACK cards, and runbook formatting.
+- Step 18.4: Simplified Telegram formatting into a calmer incident-brief layout: quick conclusion, compact classification, top 3 priorities, and one next step.
+- Step 18.5: Rolled Telegram chat output back from MarkdownV2 to the realtime alert-style HTML format with severity/domain icons, bold labels, compact code values, and priority findings.
+- Step 18.6: Added assistant-feedback intent handling. Meta/conversational corrections such as "không phải yêu cầu xuất log" are answered directly and never trigger log listing or alert dumps.
+
+- Step 18.7: Added professional web runtime controls with on/off buttons for Telegram alerts, Gmail reports, log generation, and editable generator interval.
+- Step 18.8: Fixed hosted Telegram alert delivery and ACK reliability with scheduler job isolation, separate chat/ACK cursors, and reply-to-message ACK matching.
+- Step 18.9: Added Telegram alert counters with `Today`, `24h`, `7d`, `All`, plus a reset counters action.
+- Step 19: Deployed final hosted demo runtime v17 and prepared the GreenNode submission packet.
 
 ## Current Status
 
-MVP local progress: about 99%.
+MVP local progress: complete.
+
+GreenNode AgentBase demo progress: ready for submission.
+
+Final hosted runtime:
+
+```text
+Runtime ID: runtime-a864917b-1a16-4083-a64c-82f4e79f6602
+Endpoint: https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
+Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17
+Submission packet: docs/submission.md
+```
 
 Working commands:
 
@@ -56,6 +81,15 @@ Working commands:
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --scan
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --report
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --email-report --dry-run
+C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --init-telegram-chat
+C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --telegram-chat
+```
+
+Current local Telegram chat bridge log files:
+
+```text
+data\telegram-chat-bridge-live.out.log
+data\telegram-chat-bridge-live.err.log
 ```
 
 PDF report generation is working. Latest reports are stored in:
@@ -168,7 +202,20 @@ C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --scheduler
 ```
 
-8. Continue to Step 13: GreenNode AgentBase packaging/deployment.
+8. Continue with optional deployment hardening:
+
+```powershell
+C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m pytest -q
+docker build --platform linux/amd64 -t infra-log-sentinel-agent:test .
+docker run --rm -p 8080:8080 infra-log-sentinel-agent:test
+```
+
+Then verify:
+
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" -UseBasicParsing
+Invoke-WebRequest -Uri "http://127.0.0.1:8080/status" -UseBasicParsing
+```
 
 Useful Step 12.5 checks:
 

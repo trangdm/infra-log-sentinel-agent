@@ -8,6 +8,11 @@ import sqlite3
 from infra_log_sentinel.models import LogEvent
 
 
+TELEGRAM_LEGACY_CURSOR_KEY = "telegram_last_update_id"
+TELEGRAM_CHAT_CURSOR_KEY = "telegram_chat_last_update_id"
+TELEGRAM_ACK_CURSOR_KEY = "telegram_ack_last_update_id"
+
+
 @dataclass(frozen=True)
 class AlertRecord:
     alert_id: str
@@ -108,6 +113,42 @@ class AlertStore:
             ).fetchone()
         return None if row is None else str(row["status"])
 
+    def status_counts(self, since_ts: int | None = None) -> dict[str, int]:
+        with self._connect() as connection:
+            if since_ts is None:
+                rows = connection.execute(
+                    """
+                    SELECT status, COUNT(*) AS count
+                    FROM alerts
+                    GROUP BY status
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT status, COUNT(*) AS count
+                    FROM alerts
+                    WHERE sent_at_ts >= ?
+                    GROUP BY status
+                    """,
+                    (since_ts,),
+                ).fetchall()
+        counts = {str(row["status"]): int(row["count"]) for row in rows}
+        sent_total = sum(counts.values())
+        return {
+            "sent_total": sent_total,
+            "pending": counts.get("pending", 0),
+            "acknowledged": counts.get("acknowledged", 0),
+            "escalated": counts.get("escalated", 0),
+        }
+
+    def reset_alerts(self) -> int:
+        with self._connect() as connection:
+            row = connection.execute("SELECT COUNT(*) AS count FROM alerts").fetchone()
+            deleted_count = 0 if row is None else int(row["count"])
+            connection.execute("DELETE FROM alerts")
+        return deleted_count
+
     def mark_acknowledged(
         self,
         alert_id: str,
@@ -147,11 +188,28 @@ class AlertStore:
             )
 
     def get_last_update_id(self) -> int | None:
-        value = self.get_metadata("telegram_last_update_id")
-        return int(value) if value is not None else None
+        return self.get_chat_update_id()
 
     def set_last_update_id(self, update_id: int) -> None:
-        self.set_metadata("telegram_last_update_id", str(update_id))
+        self.set_chat_update_id(update_id)
+
+    def get_chat_update_id(self) -> int | None:
+        return self._get_update_id(TELEGRAM_CHAT_CURSOR_KEY)
+
+    def set_chat_update_id(self, update_id: int) -> None:
+        self.set_metadata(TELEGRAM_CHAT_CURSOR_KEY, str(update_id))
+
+    def get_ack_update_id(self) -> int | None:
+        return self._get_update_id(TELEGRAM_ACK_CURSOR_KEY)
+
+    def set_ack_update_id(self, update_id: int) -> None:
+        self.set_metadata(TELEGRAM_ACK_CURSOR_KEY, str(update_id))
+
+    def _get_update_id(self, key: str) -> int | None:
+        value = self.get_metadata(key)
+        if value is None:
+            value = self.get_metadata(TELEGRAM_LEGACY_CURSOR_KEY)
+        return int(value) if value is not None else None
 
     def get_metadata(self, key: str) -> str | None:
         with self._connect() as connection:

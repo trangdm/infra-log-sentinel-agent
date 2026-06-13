@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape
+import threading
 import time
 
 import requests
@@ -17,6 +18,8 @@ from infra_log_sentinel.state.alert_store import AlertRecord, AlertStore, build_
 TELEGRAM_API_BASE = "https://api.telegram.org"
 TELEGRAM_TIMEOUT = (10, 45)
 TELEGRAM_RETRIES = 2
+ACK_TIME_GRACE_SECONDS = 120
+_GET_UPDATES_LOCK = threading.Lock()
 PLACEHOLDER_VALUES = {
     "",
     "replace_with_telegram_bot_token",
@@ -57,6 +60,8 @@ class TelegramUpdate:
     update_id: int
     message_date_ts: int
     text: str
+    message_id: int | None = None
+    reply_to_message_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -100,6 +105,37 @@ def check_telegram_health(settings: Settings) -> str:
         raise TelegramSendError(_telegram_error("Telegram health message failed", response))
 
     return f"Telegram health check OK. Bot @{username} can send messages to the configured chat."
+
+
+def send_telegram_message(
+    settings: Settings,
+    text: str,
+    parse_mode: str | None = None,
+) -> int | None:
+    token = settings.telegram_bot_token.strip()
+    chat_id = settings.telegram_chat_id.strip()
+    config_errors = _config_errors(token, chat_id)
+    if config_errors:
+        raise TelegramConfigError("Invalid Telegram configuration: " + ", ".join(config_errors))
+    return _send_message(token=token, chat_id=chat_id, text=text, parse_mode=parse_mode)
+
+
+def fetch_telegram_updates(
+    settings: Settings,
+    offset: int | None = None,
+    timeout_seconds: int = 0,
+) -> list[TelegramUpdate]:
+    token = settings.telegram_bot_token.strip()
+    chat_id = settings.telegram_chat_id.strip()
+    config_errors = _config_errors(token, chat_id)
+    if config_errors:
+        raise TelegramConfigError("Invalid Telegram configuration: " + ", ".join(config_errors))
+    return _fetch_updates(
+        token=token,
+        chat_id=chat_id,
+        offset=offset,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def send_telegram_alerts(
@@ -191,11 +227,12 @@ def check_ack_and_escalations(
             message="No pending alerts found.",
         )
 
-    last_update_id = alert_store.get_last_update_id()
+    last_update_id = alert_store.get_ack_update_id()
     updates = _fetch_updates(
         token=token,
         chat_id=chat_id,
         offset=None if last_update_id is None else last_update_id + 1,
+        timeout_seconds=0,
     )
 
     pending_by_id = {alert.alert_id: alert for alert in pending_alerts}
@@ -205,7 +242,12 @@ def check_ack_and_escalations(
     for update in updates:
         if max_update_id is None or update.update_id > max_update_id:
             max_update_id = update.update_id
-        target_ids = _target_alert_ids_for_ack(update.text, update.message_date_ts, pending_by_id)
+        target_ids = _target_alert_ids_for_ack(
+            update.text,
+            update.message_date_ts,
+            pending_by_id,
+            reply_to_message_id=update.reply_to_message_id,
+        )
         for alert_id in target_ids:
             if alert_id in acked_ids:
                 continue
@@ -247,7 +289,7 @@ def check_ack_and_escalations(
         escalated_count += 1
 
     if max_update_id is not None and not dry_run:
-        alert_store.set_last_update_id(max_update_id)
+        alert_store.set_ack_update_id(max_update_id)
 
     pending_count = (
         max(0, len(pending_alerts) - len(acked_ids))
@@ -327,16 +369,24 @@ def format_escalation_message(alert: AlertRecord) -> str:
     )
 
 
-def _send_message(token: str, chat_id: str, text: str) -> int | None:
+def _send_message(
+    token: str,
+    chat_id: str,
+    text: str,
+    parse_mode: str | None = "HTML",
+) -> int | None:
+    payload: dict[str, object] = {
+        "chat_id": chat_id,
+        "text": text,
+        "disable_web_page_preview": True,
+    }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+
     response = _telegram_post(
         token=token,
         method="sendMessage",
-        json_payload={
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        },
+        json_payload=payload,
     )
     if response.ok:
         try:
@@ -350,22 +400,28 @@ def _send_message(token: str, chat_id: str, text: str) -> int | None:
     raise TelegramSendError(_telegram_error("Telegram API failed", response))
 
 
-def _fetch_updates(token: str, chat_id: str, offset: int | None) -> list[TelegramUpdate]:
+def _fetch_updates(
+    token: str,
+    chat_id: str,
+    offset: int | None,
+    timeout_seconds: int = 0,
+) -> list[TelegramUpdate]:
     payload: dict[str, object] = {
-        "timeout": 0,
-        "allowed_updates": ["message"],
+        "timeout": max(timeout_seconds, 0),
+        "allowed_updates": ["message", "channel_post"],
     }
     if offset is not None:
         payload["offset"] = offset
 
-    response = _telegram_post(token=token, method="getUpdates", json_payload=payload)
+    with _GET_UPDATES_LOCK:
+        response = _telegram_post(token=token, method="getUpdates", json_payload=payload)
     if not response.ok:
         raise TelegramSendError(_telegram_error("Telegram getUpdates failed", response))
 
     payload = response.json()
     updates: list[TelegramUpdate] = []
     for item in payload.get("result", []):
-        message = item.get("message")
+        message = item.get("message") or item.get("channel_post")
         if not message:
             continue
         message_chat = message.get("chat", {})
@@ -374,11 +430,14 @@ def _fetch_updates(token: str, chat_id: str, offset: int | None) -> list[Telegra
         text = str(message.get("text") or message.get("caption") or "").strip()
         if not text:
             continue
+        reply_to_message = message.get("reply_to_message") or {}
         updates.append(
             TelegramUpdate(
                 update_id=int(item["update_id"]),
                 message_date_ts=int(message.get("date", 0)),
                 text=text,
+                message_id=_optional_int(message.get("message_id")),
+                reply_to_message_id=_optional_int(reply_to_message.get("message_id")),
             )
         )
     return updates
@@ -388,6 +447,7 @@ def _target_alert_ids_for_ack(
     text: str,
     message_date_ts: int,
     pending_by_id: dict[str, AlertRecord],
+    reply_to_message_id: int | None = None,
 ) -> list[str]:
     lowered = text.lower()
     explicit_ids = [
@@ -396,12 +456,28 @@ def _target_alert_ids_for_ack(
     if explicit_ids:
         return explicit_ids
 
+    if reply_to_message_id is not None:
+        reply_matches = [
+            alert.alert_id
+            for alert in pending_by_id.values()
+            if alert.telegram_message_id == reply_to_message_id
+        ]
+        if reply_matches:
+            return reply_matches
+
     # Requirement: any reply in the Telegram chat counts as acknowledgement.
     return [
         alert.alert_id
         for alert in pending_by_id.values()
-        if alert.sent_at_ts <= message_date_ts
+        if alert.sent_at_ts - ACK_TIME_GRACE_SECONDS <= message_date_ts
     ]
+
+
+def _optional_int(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _config_errors(token: str, chat_id: str) -> list[str]:

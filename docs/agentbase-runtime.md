@@ -61,6 +61,10 @@ Completed:
   - `RUNTIME_SCHEDULER_DRY_RUN`
   - `RUNTIME_SCHEDULER_MAX_ALERTS`
   - `RUNTIME_SCHEDULER_MAX_ESCALATIONS`
+- Added optional Telegram chat bridge flags:
+  - `TELEGRAM_CHAT_ENABLED`
+  - `TELEGRAM_CHAT_POLL_INTERVAL_SECONDS`
+  - `TELEGRAM_CHAT_DRY_RUN`
 - Docker image defaults now support a self-contained GreenNode demo:
   - Bootstraps 16 synthetic logs if the runtime log folder is empty.
   - Appends one abnormal synthetic log every 30 seconds.
@@ -121,6 +125,40 @@ bat lai sinh log
 bat lai tat ca
 ```
 
+## Step 17 hosted submission runtime
+
+Completed:
+
+- Deployed GreenNode AgentBase runtime:
+  - Runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
+  - Endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
+  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17`
+- Added Telegram chat bridge for operator questions through Telegram.
+- Hardened agent chat logic:
+  - Intent routing separates operational questions, report requests, runtime controls, command explanations, and assistant-feedback corrections.
+  - Follow-up questions use conversation state instead of being treated as unrelated one-line commands.
+  - Requests like "report in chat UI" return inline summaries instead of sending Gmail by default.
+- Added professional web UI for the hosted demo:
+  - Focused chat console.
+  - Priority queue.
+  - Runtime controls.
+  - Telegram alert delivery state.
+  - Telegram counter panel with `Today`, `24h`, `7d`, `All`, and reset action.
+- Added Telegram delivery reliability:
+  - Alert scan job exception isolation.
+  - Separate Telegram chat and ACK cursors.
+  - Reply-to-message ACK matching.
+  - ACK/escalation checks continue while the scheduler worker stays alive.
+
+Verified after v17 deployment:
+
+- `GET /health` returned `ok`.
+- `GET /status` returned `telegram_alert_metrics.windows`.
+- Telegram alert delivery state was `live`.
+- Runtime scheduler worker state was `running`.
+- Hosted UI contained the Telegram counter filter tabs and reset button.
+- Runtime container regression suite passed: `25 passed`.
+
 ## Runtime contract
 
 GreenNode AgentBase Custom Agent requires:
@@ -175,6 +213,17 @@ docker run --rm -p 8080:8080 infra-log-sentinel-agent:test
 ```
 
 The image defaults create `/app/data/logs`, bootstrap synthetic logs, and append a new abnormal log every 30 seconds.
+
+Enable Telegram chat after bot token and chat ID are configured:
+
+```powershell
+C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --init-telegram-chat
+docker run --rm -p 8080:8080 --env-file .env `
+  -e TELEGRAM_CHAT_ENABLED=true `
+  infra-log-sentinel-agent:test
+```
+
+The bridge uses polling and the same `telegram_last_update_id` cursor as ACK checks, so initialize the cursor before a live demo if the bot has old queued messages.
 
 Enable autonomous scheduler delivery only when Gmail and Telegram env vars are ready:
 

@@ -23,6 +23,8 @@ class PauseState:
     def as_text(self) -> str:
         if not self.paused or self.paused_until is None:
             return f"{self.name}: running"
+        if self.paused_until.year >= 9999:
+            return f"{self.name}: off until enabled again"
         return f"{self.name}: paused until {self.paused_until:%Y-%m-%d %H:%M:%S}"
 
 
@@ -118,6 +120,7 @@ class RuntimeControlStore:
                 name: {
                     "paused": state.paused,
                     "paused_until": None if state.paused_until is None else state.paused_until.isoformat(),
+                    "manual_off": bool(state.paused_until and state.paused_until.year >= 9999),
                 }
                 for name in controls
                 for state in [self.pause_state(name)]

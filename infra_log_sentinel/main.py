@@ -4,9 +4,8 @@ import argparse
 from collections import Counter
 import sys
 
-from .chat.actions import try_execute_chat_action
-from .chat.llm_assistant import answer_with_llm
-from .chat.log_chat import answer_log_question, run_interactive_chat
+from .chat.log_chat import run_interactive_chat
+from .chat.responder import answer_or_execute_chat
 from .config import load_settings
 from .analysis.time_window import filter_events_by_lookback
 from .ingestion.local_folder import initialize_log_cursors, iter_log_lines, iter_new_log_lines
@@ -17,6 +16,11 @@ from .notifications.telegram_sender import (
     check_ack_and_escalations,
     check_telegram_health,
     send_telegram_alerts,
+)
+from .notifications.telegram_chat import (
+    initialize_telegram_update_cursor,
+    run_telegram_chat_forever,
+    run_telegram_chat_once,
 )
 from .parsing.log_parser import parse_raw_lines
 from .reporting.pdf_report import build_pdf_report
@@ -34,6 +38,21 @@ def main() -> None:
     parser.add_argument("--email-report", action="store_true", help="Generate a PDF report and send it through Gmail")
     parser.add_argument("--telegram-alerts", action="store_true", help="Send Telegram alerts for configured severities")
     parser.add_argument("--telegram-health", action="store_true", help="Test Telegram bot connectivity and chat delivery")
+    parser.add_argument(
+        "--telegram-chat",
+        action="store_true",
+        help="Run Telegram chat bridge loop",
+    )
+    parser.add_argument(
+        "--telegram-chat-once",
+        action="store_true",
+        help="Process one Telegram chat bridge cycle",
+    )
+    parser.add_argument(
+        "--init-telegram-chat",
+        action="store_true",
+        help="Mark current Telegram updates as already consumed",
+    )
     parser.add_argument("--check-acks", action="store_true", help="Check Telegram ACK replies and escalate expired alerts")
     parser.add_argument("--init-log-cursor", action="store_true", help="Mark current log folder content as already consumed")
     parser.add_argument("--new-only", action="store_true", help="Process only new log lines since the last cursor update")
@@ -57,6 +76,9 @@ def main() -> None:
         and not args.email_report
         and not args.telegram_alerts
         and not args.telegram_health
+        and not args.telegram_chat
+        and not args.telegram_chat_once
+        and not args.init_telegram_chat
         and not args.check_acks
         and not args.init_log_cursor
         and not args.scheduler
@@ -75,6 +97,7 @@ def main() -> None:
         print("Run with --email-report to generate and send a PDF report through Gmail.")
         print("Run with --telegram-alerts to send warning/error/critical alerts through Telegram.")
         print("Run with --telegram-health to test Telegram connectivity.")
+        print("Run with --telegram-chat to answer Telegram messages through the configured chat.")
         print("Run with --check-acks to process Telegram ACK replies and escalations.")
         print("Run with --init-log-cursor to baseline existing logs before realtime alerting.")
         print("Run with --scheduler to start the local scheduler loop.")
@@ -176,6 +199,39 @@ def main() -> None:
         except (TelegramConfigError, TelegramSendError) as exc:
             raise SystemExit(str(exc)) from exc
 
+    if args.init_telegram_chat:
+        try:
+            consumed_count = initialize_telegram_update_cursor(settings)
+        except (TelegramConfigError, TelegramSendError) as exc:
+            raise SystemExit(str(exc)) from exc
+        print(
+            "Initialized Telegram chat cursor. "
+            f"Marked {consumed_count} existing update(s) as consumed."
+        )
+
+    if args.telegram_chat_once:
+        try:
+            responder = _build_chat_responder(settings, args.dry_run, channel="telegram")
+            result = run_telegram_chat_once(
+                settings=settings,
+                responder=responder,
+                dry_run=args.dry_run,
+            )
+        except (TelegramConfigError, TelegramSendError) as exc:
+            raise SystemExit(str(exc)) from exc
+        print(result.message)
+
+    if args.telegram_chat:
+        try:
+            responder = _build_chat_responder(settings, args.dry_run, channel="telegram")
+            run_telegram_chat_forever(
+                settings=settings,
+                responder=responder,
+                dry_run=args.dry_run,
+            )
+        except (TelegramConfigError, TelegramSendError) as exc:
+            raise SystemExit(str(exc)) from exc
+
     if args.check_acks:
         try:
             result = check_ack_and_escalations(
@@ -215,12 +271,13 @@ def main() -> None:
 
     if args.chat is not None:
         if args.chat:
-            print(_answer_or_execute_chat(settings, args.chat, args.dry_run))
+            print(_answer_or_execute_chat(settings, args.chat, args.dry_run, channel="cli"))
         else:
+            responder = _build_chat_responder(settings, args.dry_run, channel="cli")
             run_interactive_chat(
                 events,
                 settings.severity_alert_levels,
-                responder=lambda question: _answer_or_execute_chat(settings, question, args.dry_run),
+                responder=responder,
             )
 
 
@@ -245,21 +302,15 @@ def _print_scan_summary(raw_lines_count: int, events: list, alert_levels: tuple[
         )
 
 
-def _answer_or_execute_chat(settings, question: str, dry_run: bool) -> str:
-    raw_lines = list(iter_log_lines(settings.log_root_path))
-    events = parse_raw_lines(raw_lines)
-    action_result = try_execute_chat_action(
-        settings=settings,
-        events=events,
-        question=question,
-        dry_run=dry_run,
-    )
-    if action_result.handled:
-        return action_result.message
-    llm_answer = answer_with_llm(settings, events, question, settings.severity_alert_levels)
-    if llm_answer:
-        return llm_answer
-    return answer_log_question(events, question, settings.severity_alert_levels)
+def _answer_or_execute_chat(settings, question: str, dry_run: bool, channel: str = "cli") -> str:
+    return answer_or_execute_chat(settings, question, dry_run=dry_run, channel=channel)
+
+
+def _build_chat_responder(settings, dry_run: bool, channel: str = "cli"):
+    def responder(question: str) -> str:
+        return _answer_or_execute_chat(settings, question, dry_run, channel=channel)
+
+    return responder
 
 
 def _configure_console_encoding() -> None:

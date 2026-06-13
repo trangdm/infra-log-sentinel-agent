@@ -36,6 +36,9 @@ class Settings:
     telegram_bot_token: str
     telegram_chat_id: str
     telegram_ack_keywords: tuple[str, ...]
+    telegram_chat_enabled: bool
+    telegram_chat_poll_interval_seconds: float
+    telegram_chat_dry_run: bool
     llm_provider: str
     llm_api_base: str
     llm_api_key: str
@@ -95,6 +98,11 @@ def load_settings(env_file: str | None = None) -> Settings:
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
         telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
         telegram_ack_keywords=_csv_env("TELEGRAM_ACK_KEYWORDS", "ACK,ack,noted,da nhan"),
+        telegram_chat_enabled=_bool_env("TELEGRAM_CHAT_ENABLED", False),
+        telegram_chat_poll_interval_seconds=float(
+            os.getenv("TELEGRAM_CHAT_POLL_INTERVAL_SECONDS", "3")
+        ),
+        telegram_chat_dry_run=_bool_env("TELEGRAM_CHAT_DRY_RUN", False),
         llm_provider=os.getenv("LLM_PROVIDER", "greennode"),
         llm_api_base=os.getenv("LLM_API_BASE", os.getenv("LLM_BASE_URL", os.getenv("AIP_BASE_URL", ""))),
         llm_api_key=os.getenv("LLM_API_KEY", ""),

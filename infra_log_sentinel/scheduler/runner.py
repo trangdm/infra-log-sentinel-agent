@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 import time
+import traceback
 
 import schedule
 
@@ -79,16 +80,21 @@ def run_scheduler_forever(
     )
 
     schedule.every().day.at(settings.report_time).do(
-        lambda: _print_job_result(run_daily_report(settings=settings, dry_run=dry_run))
-    )
-    schedule.every(settings.scan_interval_seconds).seconds.do(
-        lambda: _print_job_result(
-            run_alert_scan(settings=settings, dry_run=dry_run, max_alerts=max_alerts)
+        lambda: _run_job_safely(
+            "Daily report job",
+            lambda: run_daily_report(settings=settings, dry_run=dry_run),
         )
     )
     schedule.every(settings.scan_interval_seconds).seconds.do(
-        lambda: _print_job_result(
-            run_ack_check(
+        lambda: _run_job_safely(
+            "Alert scan job",
+            lambda: run_alert_scan(settings=settings, dry_run=dry_run, max_alerts=max_alerts),
+        )
+    )
+    schedule.every(settings.scan_interval_seconds).seconds.do(
+        lambda: _run_job_safely(
+            "ACK/escalation job",
+            lambda: run_ack_check(
                 settings=settings,
                 dry_run=dry_run,
                 max_escalations=max_escalations,
@@ -197,3 +203,11 @@ def _load_events(settings: Settings):
 def _print_job_result(message: str) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{timestamp} | {message}", flush=True)
+
+
+def _run_job_safely(job_name: str, callback) -> None:
+    try:
+        _print_job_result(callback())
+    except Exception as exc:
+        _print_job_result(f"{job_name} failed: {type(exc).__name__}: {exc}")
+        traceback.print_exc()

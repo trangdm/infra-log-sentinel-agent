@@ -50,6 +50,25 @@ def answer_log_question(
     return _priority_answer(filtered)
 
 
+def should_answer_with_rules_first(question: str) -> bool:
+    q = _normalize(question)
+    has_log_scope = (
+        "log" in q
+        or "alert" in q
+        or any(domain in q for domain in DOMAINS)
+        or any(severity in q for severity in SEVERITIES)
+        or bool(_event_type_terms(q))
+        or bool(_message_phrase_terms(q))
+    )
+    if not has_log_scope:
+        return False
+
+    if _detect_intent(question) in {"summary", "commands", "cause"}:
+        return True
+
+    return any(term in q for term in ["co ", "khong", "nao", "uu tien", "can xem"])
+
+
 def run_interactive_chat(
     events: list[LogEvent],
     alert_levels: tuple[str, ...],

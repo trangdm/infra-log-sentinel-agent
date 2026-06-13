@@ -454,6 +454,266 @@ CHAT_UI_HTML = r"""<!doctype html>
       margin-bottom: 0;
     }
 
+    .answer-banner {
+      margin: -2px 0 15px;
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 11px;
+      align-items: start;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius);
+      background: #f8fbfa;
+    }
+
+    .answer.context-summary .answer-banner {
+      border-left-color: var(--green);
+      background: #f6fbf8;
+    }
+
+    .answer.context-runbook .answer-banner {
+      border-left-color: var(--blue);
+      background: #f6f9ff;
+    }
+
+    .answer.context-command .answer-banner {
+      border-left-color: var(--purple);
+      background: #f8f7ff;
+    }
+
+    .answer.context-clarify .answer-banner {
+      border-left-color: var(--amber);
+      background: #fffaf0;
+    }
+
+    .answer.context-action .answer-banner {
+      border-left-color: var(--accent);
+      background: #f5fbf9;
+    }
+
+    .answer-banner-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      color: #ffffff;
+      background: var(--accent);
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: 0.02em;
+    }
+
+    .answer.context-summary .answer-banner-icon {
+      background: var(--green);
+    }
+
+    .answer.context-runbook .answer-banner-icon {
+      background: var(--blue);
+    }
+
+    .answer.context-command .answer-banner-icon {
+      background: var(--purple);
+    }
+
+    .answer.context-clarify .answer-banner-icon {
+      background: var(--amber);
+    }
+
+    .answer-banner-kicker {
+      margin: 0 0 3px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .answer-banner-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.25;
+      font-weight: 900;
+    }
+
+    .answer-banner-subtitle {
+      margin: 4px 0 0;
+      color: var(--muted-strong);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .answer-section-title {
+      margin: 16px 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-strong);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .answer-section-title::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .answer-field {
+      margin: 8px 0;
+      display: grid;
+      grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .answer-field-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .answer-field-value {
+      color: var(--text);
+      font-weight: 720;
+      overflow-wrap: anywhere;
+    }
+
+    .answer-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .answer-mini-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .answer-mini-chip .chip-key {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .answer-mini-chip .chip-value {
+      color: var(--text);
+      font-weight: 950;
+    }
+
+    .answer-mini-chip.critical {
+      border-color: #f3b9b5;
+      background: var(--red-soft);
+    }
+
+    .answer-mini-chip.error {
+      border-color: #f2c59e;
+      background: #fce7d5;
+    }
+
+    .answer-mini-chip.warning {
+      border-color: #f2d58a;
+      background: var(--amber-soft);
+    }
+
+    .answer-mini-chip.info {
+      border-color: #b9c9ed;
+      background: var(--blue-soft);
+    }
+
+    .finding-card {
+      margin: 10px 0;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--blue);
+      border-radius: var(--radius);
+      background: #ffffff;
+      box-shadow: 0 5px 14px rgba(21, 32, 27, 0.04);
+    }
+
+    .finding-card.critical {
+      border-left-color: var(--red);
+      background: #fff8f7;
+    }
+
+    .finding-card.error {
+      border-left-color: #c86412;
+      background: #fff9f4;
+    }
+
+    .finding-card.warning {
+      border-left-color: var(--amber);
+      background: #fffdf7;
+    }
+
+    .finding-card.info {
+      border-left-color: var(--blue);
+      background: #f8fbff;
+    }
+
+    .finding-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+
+    .finding-index {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .finding-location {
+      min-width: 0;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .finding-type {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .finding-message {
+      margin: 0;
+      color: var(--muted-strong);
+      line-height: 1.52;
+    }
+
     .answer h2,
     .answer h3,
     .answer h4 {
@@ -613,6 +873,32 @@ CHAT_UI_HTML = r"""<!doctype html>
       overflow: hidden;
     }
 
+    .command-card.verify,
+    .command-card.check {
+      border-color: #bfd9d2;
+      border-left-color: var(--accent);
+    }
+
+    .command-card.investigate,
+    .command-card.analyze {
+      border-color: #bcc9ea;
+      border-left-color: var(--blue);
+      background: #f8fbff;
+    }
+
+    .command-card.remediate,
+    .command-card.fix {
+      border-color: #f1b7b2;
+      border-left-color: var(--red);
+      background: #fff8f7;
+    }
+
+    .command-card.validate {
+      border-color: #badbc8;
+      border-left-color: var(--green);
+      background: #f7fcf9;
+    }
+
     .command-head {
       min-height: 40px;
       padding: 8px 10px;
@@ -624,12 +910,43 @@ CHAT_UI_HTML = r"""<!doctype html>
       border-bottom: 1px solid #d2e7e1;
     }
 
+    .command-card.investigate .command-head,
+    .command-card.analyze .command-head {
+      background: var(--blue-soft);
+      border-bottom-color: #cbd8f2;
+    }
+
+    .command-card.remediate .command-head,
+    .command-card.fix .command-head {
+      background: var(--red-soft);
+      border-bottom-color: #f0c4c0;
+    }
+
+    .command-card.validate .command-head {
+      background: var(--green-soft);
+      border-bottom-color: #cde7d8;
+    }
+
     .phase {
       color: var(--accent-strong);
       font-size: 12px;
       font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.06em;
+    }
+
+    .command-card.investigate .phase,
+    .command-card.analyze .phase {
+      color: var(--blue);
+    }
+
+    .command-card.remediate .phase,
+    .command-card.fix .phase {
+      color: var(--red);
+    }
+
+    .command-card.validate .phase {
+      color: var(--green);
     }
 
     .command-copy {
@@ -869,6 +1186,277 @@ CHAT_UI_HTML = r"""<!doctype html>
       gap: 6px;
     }
 
+    .control-list {
+      gap: 9px;
+    }
+
+    .runtime-control-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .runtime-control-card:focus-within {
+      border-color: #8fc9bf;
+      box-shadow: 0 0 0 3px rgba(15, 139, 125, 0.12);
+    }
+
+    .telegram-counter-panel {
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .telegram-counter-toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .telegram-counter-title {
+      display: block;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 950;
+      line-height: 1.25;
+    }
+
+    .telegram-counter-window {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      line-height: 1.3;
+    }
+
+    .telegram-reset {
+      min-height: 26px;
+      padding: 4px 9px;
+      border: 1px solid #f0b6b0;
+      border-radius: var(--radius);
+      background: #fff7f6;
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .telegram-reset:hover {
+      background: #ffecea;
+      border-color: #e88f87;
+    }
+
+    .telegram-reset:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
+    .telegram-window-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 5px;
+      margin-bottom: 8px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+    }
+
+    .telegram-window-tab {
+      min-height: 25px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted-strong);
+      font-size: 11px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .telegram-window-tab.is-active {
+      background: #ffffff;
+      color: var(--accent-strong);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .telegram-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .telegram-metric {
+      min-height: 58px;
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    .telegram-metric span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .telegram-metric strong {
+      display: block;
+      color: var(--text);
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .telegram-metric.sent {
+      border-color: #c7d7f3;
+      background: var(--blue-soft);
+    }
+
+    .telegram-metric.acked {
+      border-color: #badbc8;
+      background: var(--green-soft);
+    }
+
+    .telegram-metric.pending {
+      border-color: #f2d58a;
+      background: var(--amber-soft);
+    }
+
+    .telegram-metric.escalated {
+      border-color: #f3b9b5;
+      background: var(--red-soft);
+    }
+
+    .telegram-metric.sent strong {
+      color: var(--blue);
+    }
+
+    .telegram-metric.acked strong {
+      color: var(--green);
+    }
+
+    .telegram-metric.pending strong {
+      color: var(--amber);
+    }
+
+    .telegram-metric.escalated strong {
+      color: var(--red);
+    }
+
+    .runtime-control-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .runtime-control-head strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .runtime-control-head small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .switch {
+      width: 46px;
+      height: 26px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: #dfe6eb;
+      padding: 2px;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .switch span {
+      display: block;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 2px 7px rgba(21, 32, 27, 0.18);
+      transition: transform 0.16s ease;
+    }
+
+    .switch.is-on {
+      border-color: #51aa86;
+      background: #1f9d68;
+    }
+
+    .switch.is-on span {
+      transform: translateX(20px);
+    }
+
+    .switch:disabled,
+    .control-save:disabled {
+      cursor: wait;
+      opacity: 0.62;
+    }
+
+    .interval-control {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .interval-control input {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .interval-control input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 139, 125, 0.12);
+    }
+
+    .control-save {
+      min-height: 34px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #ffffff;
+      cursor: pointer;
+      padding: 0 11px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .control-save:hover {
+      background: var(--accent-strong);
+    }
+
     .control-item,
     .fact {
       display: flex;
@@ -906,9 +1494,32 @@ CHAT_UI_HTML = r"""<!doctype html>
       background: var(--green-soft);
     }
 
+    .control-badge.live {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .control-badge.off {
+      color: var(--muted-strong);
+      background: var(--surface-strong);
+    }
+
     .control-badge.paused {
       color: var(--amber);
       background: var(--amber-soft);
+    }
+
+    .control-badge.dry-run,
+    .control-badge.disabled {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .control-badge.misconfigured,
+    .control-badge.worker-down,
+    .control-badge.error {
+      color: var(--red);
+      background: var(--red-soft);
     }
 
     .domain-bars {
@@ -1111,6 +1722,20 @@ CHAT_UI_HTML = r"""<!doctype html>
         padding: 16px;
       }
 
+      .answer-banner,
+      .answer-field {
+        grid-template-columns: 1fr;
+      }
+
+      .answer-banner-icon {
+        width: 34px;
+        height: 34px;
+      }
+
+      .answer-field-label {
+        margin-bottom: -3px;
+      }
+
       .message,
       .message.user {
         grid-template-columns: 1fr;
@@ -1244,10 +1869,82 @@ CHAT_UI_HTML = r"""<!doctype html>
       <section class="rail-section">
         <h3>Runtime controls</h3>
         <div class="control-list">
-          <div class="control-item"><span>Telegram alerts</span><strong id="control-telegram">-</strong></div>
-          <div class="control-item"><span>Gmail reports</span><strong id="control-email">-</strong></div>
-          <div class="control-item"><span>Log generator</span><strong id="control-loggen">-</strong></div>
-          <div class="control-item"><span>Generator interval</span><strong id="control-interval">-</strong></div>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
+                <strong>Telegram alerts</strong>
+                <small id="control-telegram-detail">Realtime alert delivery</small>
+              </div>
+              <span id="control-telegram" class="control-badge disabled">-</span>
+            </div>
+            <button class="switch" type="button" data-runtime-control="telegram_alerts" aria-label="Toggle Telegram alerts" aria-checked="false"><span></span></button>
+          </article>
+          <div class="telegram-counter-panel" aria-label="Telegram alert counters">
+            <div class="telegram-counter-toolbar">
+              <div>
+                <span class="telegram-counter-title">Telegram counters</span>
+                <small id="telegram-window-label" class="telegram-counter-window">Today</small>
+              </div>
+              <button id="telegram-reset-counters" class="telegram-reset" type="button">Reset</button>
+            </div>
+            <div class="telegram-window-tabs" role="tablist" aria-label="Telegram counter window">
+              <button class="telegram-window-tab is-active" type="button" data-telegram-window="today">Today</button>
+              <button class="telegram-window-tab" type="button" data-telegram-window="24h">24h</button>
+              <button class="telegram-window-tab" type="button" data-telegram-window="7d">7d</button>
+              <button class="telegram-window-tab" type="button" data-telegram-window="all">All</button>
+            </div>
+            <div class="telegram-metrics">
+              <div class="telegram-metric sent">
+                <span>Sent</span>
+                <strong id="telegram-sent-count">-</strong>
+              </div>
+              <div class="telegram-metric acked">
+                <span>ACKed</span>
+                <strong id="telegram-acked-count">-</strong>
+              </div>
+              <div class="telegram-metric pending">
+                <span>Pending</span>
+                <strong id="telegram-pending-count">-</strong>
+              </div>
+              <div class="telegram-metric escalated">
+                <span>Escalated</span>
+                <strong id="telegram-escalated-count">-</strong>
+              </div>
+            </div>
+          </div>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
+                <strong>Gmail reports</strong>
+                <small id="control-email-detail">Scheduled report delivery</small>
+              </div>
+              <span id="control-email" class="control-badge disabled">-</span>
+            </div>
+            <button class="switch" type="button" data-runtime-control="email_reports" aria-label="Toggle Gmail reports" aria-checked="false"><span></span></button>
+          </article>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
+                <strong>Log generator</strong>
+                <small id="control-loggen-detail">Synthetic runtime log stream</small>
+              </div>
+              <span id="control-loggen" class="control-badge disabled">-</span>
+            </div>
+            <button class="switch" type="button" data-runtime-control="log_generation" aria-label="Toggle log generator" aria-checked="false"><span></span></button>
+          </article>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
+                <strong>Generator interval</strong>
+                <small id="control-interval-detail">Seconds between generated logs</small>
+              </div>
+              <span id="control-interval" class="control-badge live">-</span>
+            </div>
+            <div class="interval-control">
+              <input id="control-interval-input" type="number" min="1" max="86400" step="1" inputmode="numeric" aria-label="Generator interval seconds">
+              <button id="control-interval-save" class="control-save" type="button">Save</button>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -1276,10 +1973,30 @@ CHAT_UI_HTML = r"""<!doctype html>
     const promptBox = document.getElementById("prompt");
     const dryRunBox = document.getElementById("dry-run");
     const sendButton = document.getElementById("send");
+    const conversationId = getConversationId();
 
     const state = {
-      busy: false
+      busy: false,
+      telegramMetricsWindow: "today",
+      telegramMetrics: {}
     };
+
+    function getConversationId() {
+      const key = "infra-log-sentinel-web-session";
+      try {
+        const existing = window.localStorage.getItem(key);
+        if (existing) {
+          return existing;
+        }
+        const generated = window.crypto && window.crypto.randomUUID
+          ? "web-" + window.crypto.randomUUID()
+          : "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        window.localStorage.setItem(key, generated);
+        return generated;
+      } catch (error) {
+        return "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+      }
+    }
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -1302,12 +2019,18 @@ CHAT_UI_HTML = r"""<!doctype html>
       html = html.replace(/\[(CRITICAL|ERROR|WARNING|INFO)\]/gi, function(_, level) {
         return '<span class="severity ' + level.toLowerCase() + '">' + level.toUpperCase() + '</span>';
       });
+      html = html.replace(/\b(Running|Stopped|Paused|Enabled|Disabled)\b/gi, function(status) {
+        const key = status.toLowerCase();
+        const cls = key === "running" || key === "enabled" ? "info" : key === "paused" ? "warning" : "error";
+        return '<span class="answer-mini-chip ' + cls + '">' + status + '</span>';
+      });
       html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
       return html;
     }
 
     function renderAgentContent(text) {
       const normalized = String(text || "").replace(/\r\n/g, "\n");
+      const context = classifyAgentAnswer(normalized);
       const parts = [];
       const fenceRegex = /```([A-Za-z0-9_-]*)\n([\s\S]*?)```/g;
       let lastIndex = 0;
@@ -1325,7 +2048,91 @@ CHAT_UI_HTML = r"""<!doctype html>
         parts.push(renderMarkdownBlock(normalized.slice(lastIndex)));
       }
 
-      return '<div class="answer">' + parts.join("") + '</div>';
+      return '<div class="answer context-' + context.type + '">' + renderAnswerBanner(context) + parts.join("") + '</div>';
+    }
+
+    function textKey(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    }
+
+    function classifyAgentAnswer(text) {
+      const key = textKey(text);
+      if (key.includes("runbook command") || key.includes("command de xuat") || (key.includes("verify:") && key.includes("remediate:"))) {
+        return {
+          type: "runbook",
+          icon: "RB",
+          kicker: "Response type",
+          title: "Runbook recommendation",
+          subtitle: "Commands are grouped by phase so verification stays separate from remediation."
+        };
+      }
+      if (key.includes("giai thich") || key.includes("command insight") || key.includes("dung de lam gi") || key.includes("khong phai yeu cau sinh them runbook")) {
+        return {
+          type: "command",
+          icon: "CMD",
+          kicker: "Response type",
+          title: "Command explanation",
+          subtitle: "Purpose, usage and operational risk are separated for quick review."
+        };
+      }
+      if (key.includes("tom tat") || key.includes("tong so event") || key.includes("top alert") || key.includes("theo severity") || key.includes("theo domain")) {
+        return {
+          type: "summary",
+          icon: "SUM",
+          kicker: "Response type",
+          title: "Log intelligence summary",
+          subtitle: "Signal, severity and priority findings are organized for scanning."
+        };
+      }
+      if (key.includes("thieu ngu canh") || key.includes("vui long noi ro") || key.includes("can lam ro") || key.includes("hoi lai truoc")) {
+        return {
+          type: "clarify",
+          icon: "?",
+          kicker: "Response type",
+          title: "Needs clarification",
+          subtitle: "The agent is asking for missing target, value, time window or delivery channel."
+        };
+      }
+      if (key.includes("da tao") || key.includes("da gui") || key.includes("da cap nhat") || key.includes("runtime") || key.includes("telegram") || key.includes("gmail")) {
+        return {
+          type: "action",
+          icon: "OK",
+          kicker: "Response type",
+          title: "Action result",
+          subtitle: "Execution details and state changes are grouped below."
+        };
+      }
+      if (key.includes("xin chao")) {
+        return {
+          type: "action",
+          icon: "AI",
+          kicker: "Copilot ready",
+          title: "Infrastructure Log Sentinel",
+          subtitle: "Ask about logs, reports, commands or runtime controls."
+        };
+      }
+      return {
+        type: "analysis",
+        icon: "AI",
+        kicker: "Response type",
+        title: "Operational analysis",
+        subtitle: "The answer is structured into readable findings and details."
+      };
+    }
+
+    function renderAnswerBanner(context) {
+      return '' +
+        '<div class="answer-banner">' +
+          '<div class="answer-banner-icon">' + escapeHtml(context.icon) + '</div>' +
+          '<div>' +
+            '<p class="answer-banner-kicker">' + escapeHtml(context.kicker) + '</p>' +
+            '<p class="answer-banner-title">' + escapeHtml(context.title) + '</p>' +
+            '<p class="answer-banner-subtitle">' + escapeHtml(context.subtitle) + '</p>' +
+          '</div>' +
+        '</div>';
     }
 
     function renderMarkdownBlock(text) {
@@ -1402,6 +2209,13 @@ CHAT_UI_HTML = r"""<!doctype html>
           continue;
         }
 
+        const sectionTitle = parseSectionTitle(line);
+        if (sectionTitle) {
+          flushList();
+          html.push('<div class="answer-section-title">' + inlineFormat(sectionTitle) + '</div>');
+          continue;
+        }
+
         const heading = line.match(/^(#{1,4})\s+(.+)$/);
         if (heading) {
           flushList();
@@ -1418,6 +2232,12 @@ CHAT_UI_HTML = r"""<!doctype html>
 
         const bullet = line.match(/^[-*]\s+(.+)$/);
         if (bullet) {
+          const special = renderSpecialLine(bullet[1]);
+          if (special) {
+            flushList();
+            html.push(special);
+            continue;
+          }
           if (listType !== "ul") {
             flushList();
             listType = "ul";
@@ -1426,13 +2246,26 @@ CHAT_UI_HTML = r"""<!doctype html>
           continue;
         }
 
-        const numbered = line.match(/^\d+\.\s+(.+)$/);
+        const numbered = line.match(/^(\d+)\.\s+(.+)$/);
         if (numbered) {
+          const special = renderSpecialLine(numbered[2], numbered[1]);
+          if (special) {
+            flushList();
+            html.push(special);
+            continue;
+          }
           if (listType !== "ol") {
             flushList();
             listType = "ol";
           }
-          listItems.push(numbered[1]);
+          listItems.push(numbered[2]);
+          continue;
+        }
+
+        const field = parseKeyValueLine(line);
+        if (field && shouldPromoteField(field)) {
+          flushList();
+          html.push(renderFieldCard(field.label, field.value));
           continue;
         }
 
@@ -1443,6 +2276,154 @@ CHAT_UI_HTML = r"""<!doctype html>
       flushList();
       flushTable();
       return html.join("");
+    }
+
+    function parseSectionTitle(line) {
+      const trimmed = String(line || "").trim();
+      if (!trimmed.endsWith(":") || trimmed.includes("://")) {
+        return "";
+      }
+      const title = trimmed.slice(0, -1).trim();
+      if (title.length < 2 || title.length > 56 || title.includes("|")) {
+        return "";
+      }
+      return title;
+    }
+
+    function renderSpecialLine(line, index) {
+      const finding = parseFindingLine(line, index);
+      if (finding) {
+        return renderFindingCard(finding);
+      }
+      const field = parseKeyValueLine(line);
+      if (field && shouldPromoteField(field)) {
+        return renderFieldCard(field.label, field.value);
+      }
+      return "";
+    }
+
+    function parseFindingLine(line, index) {
+      const detailed = String(line || "").match(/^\[([A-Za-z]+)\]\s+(\S+)\s+([^:]+):\s*(.+)$/);
+      if (detailed) {
+        return {
+          index: index || "",
+          severity: detailed[1],
+          location: detailed[2],
+          type: detailed[3],
+          message: detailed[4]
+        };
+      }
+      const compact = String(line || "").match(/^\[([A-Za-z]+)\]\s+(.+?)\s+-\s+(.+)$/);
+      if (compact) {
+        return {
+          index: index || "",
+          severity: compact[1],
+          location: compact[2],
+          type: compact[3],
+          message: ""
+        };
+      }
+      return null;
+    }
+
+    function renderFindingCard(finding) {
+      const severity = severityClass(finding.severity);
+      const index = finding.index ? '<span class="finding-index">#' + escapeHtml(finding.index) + '</span>' : "";
+      const message = finding.message ? '<p class="finding-message">' + inlineFormat(finding.message) + '</p>' : "";
+      return '' +
+        '<article class="finding-card ' + severity + '">' +
+          '<div class="finding-meta">' +
+            index +
+            '<span class="severity ' + severity + '">' + escapeHtml(String(finding.severity || "info").toUpperCase()) + '</span>' +
+            '<span class="finding-location">' + inlineFormat(finding.location || "-") + '</span>' +
+            '<span class="finding-type">' + inlineFormat(finding.type || "-") + '</span>' +
+          '</div>' +
+          message +
+        '</article>';
+    }
+
+    function parseKeyValueLine(line) {
+      const match = String(line || "").match(/^([^:]{2,48}):\s*(.+)$/);
+      if (!match) {
+        return null;
+      }
+      const label = match[1].trim();
+      const value = match[2].trim();
+      if (!label || !value || label.includes("://") || label.includes("|")) {
+        return null;
+      }
+      return { label: label, value: value };
+    }
+
+    function shouldPromoteField(field) {
+      const label = textKey(field.label);
+      if (label.includes("http")) {
+        return false;
+      }
+      return (
+        label.includes("tong") ||
+        label.includes("severity") ||
+        label.includes("domain") ||
+        label.includes("file") ||
+        label.includes("pham vi") ||
+        label.includes("log") ||
+        label.includes("huong xu ly") ||
+        label.includes("question") ||
+        label.includes("command") ||
+        label.includes("intent") ||
+        label.includes("risk") ||
+        label.includes("summary") ||
+        label.includes("nguyen nhan") ||
+        label.includes("tac dong")
+      );
+    }
+
+    function renderFieldCard(label, value) {
+      return '' +
+        '<div class="answer-field">' +
+          '<div class="answer-field-label">' + inlineFormat(label) + '</div>' +
+          '<div class="answer-field-value">' + renderFieldValue(value) + '</div>' +
+        '</div>';
+    }
+
+    function renderFieldValue(value) {
+      const pairs = parseValuePairs(value);
+      if (pairs.length) {
+        return '<div class="answer-chip-row">' + pairs.map(renderValueChip).join("") + '</div>';
+      }
+      return inlineFormat(value);
+    }
+
+    function parseValuePairs(value) {
+      const trimmed = String(value || "").trim();
+      if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        const body = trimmed.slice(1, -1);
+        const pairs = [];
+        const regex = /['"]?([^'",:{}]+)['"]?\s*:\s*['"]?([^,'"}]+)['"]?/g;
+        let match;
+        while ((match = regex.exec(body)) !== null) {
+          pairs.push({ key: match[1].trim(), value: match[2].trim() });
+        }
+        return pairs;
+      }
+      if (/^[A-Za-z_, -]+$/.test(trimmed) && trimmed.includes(",")) {
+        return trimmed.split(",").map(function(item) {
+          return { key: item.trim(), value: "" };
+        }).filter(function(item) {
+          return item.key;
+        });
+      }
+      return [];
+    }
+
+    function renderValueChip(pair) {
+      const severity = severityClass(pair.key);
+      const value = pair.value ? '<span class="chip-value">' + inlineFormat(pair.value) + '</span>' : "";
+      return '' +
+        '<span class="answer-mini-chip ' + severity + '">' +
+          '<span class="chip-key">' + inlineFormat(pair.key) + '</span>' +
+          value +
+        '</span>';
     }
 
     function isTableLine(line) {
@@ -1464,11 +2445,20 @@ CHAT_UI_HTML = r"""<!doctype html>
     }
 
     function renderCommandCard(phase, command) {
+      const phaseKey = phaseClass(phase);
       return '' +
-        '<div class="command-card">' +
+        '<div class="command-card ' + phaseKey + '">' +
           '<div class="command-head"><span class="phase">' + escapeHtml(phase) + '</span><button class="command-copy" type="button" data-copy="command">Copy</button></div>' +
           '<code class="command-text">' + escapeHtml(String(command || "").trim()) + '</code>' +
         '</div>';
+    }
+
+    function phaseClass(phase) {
+      const key = String(phase || "").toLowerCase();
+      if (["verify", "investigate", "remediate", "validate", "check", "analyze", "fix"].includes(key)) {
+        return key;
+      }
+      return "verify";
     }
 
     function appendMessage(role, text, extraClass) {
@@ -1481,7 +2471,13 @@ CHAT_UI_HTML = r"""<!doctype html>
 
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.innerHTML = role === "agent" ? renderAgentContent(text) : linkify(text);
+      if (role === "agent") {
+        bubble.innerHTML = extraClass === "typing"
+          ? '<div class="typing-line">' + escapeHtml(text) + '</div>'
+          : renderAgentContent(text);
+      } else {
+        bubble.innerHTML = linkify(text);
+      }
 
       if (role === "user") {
         row.appendChild(bubble);
@@ -1542,6 +2538,7 @@ CHAT_UI_HTML = r"""<!doctype html>
           },
           body: JSON.stringify({
             message: text,
+            conversation_id: conversationId,
             dry_run: dryRunBox.checked
           })
         });
@@ -1568,14 +2565,170 @@ CHAT_UI_HTML = r"""<!doctype html>
       }
     }
 
-    function formatControl(control) {
-      if (!control) {
-        return '<span class="control-badge">running</span>';
+    function controlViewState(control, delivery) {
+      const paused = Boolean(control && control.paused);
+      const manualOff = Boolean(control && control.manual_off);
+      if (delivery) {
+        return {
+          state: delivery.state || "disabled",
+          label: delivery.label || delivery.state || "unknown",
+          detail: delivery.detail || "",
+          enabled: !paused
+        };
       }
-      if (control.paused) {
-        return '<span class="control-badge paused">paused</span>';
+      if (manualOff) {
+        return {
+          state: "off",
+          label: "off",
+          detail: "Disabled until it is enabled again.",
+          enabled: false
+        };
       }
-      return '<span class="control-badge">running</span>';
+      if (paused) {
+        return {
+          state: "paused",
+          label: "paused",
+          detail: control.paused_until ? "Paused until " + control.paused_until : "Paused.",
+          enabled: false
+        };
+      }
+      return {
+        state: "live",
+        label: "on",
+        detail: "Enabled.",
+        enabled: true
+      };
+    }
+
+    function controlBadgeClass(state) {
+      const value = String(state || "").toLowerCase().replace(/_/g, "-");
+      if (["live", "off", "paused", "dry-run", "disabled", "misconfigured", "worker-down", "error"].includes(value)) {
+        return value;
+      }
+      return "disabled";
+    }
+
+    function updateControlWidget(uiKey, controlName, viewState) {
+      const badge = document.getElementById("control-" + uiKey);
+      const detail = document.getElementById("control-" + uiKey + "-detail");
+      const toggle = document.querySelector('[data-runtime-control="' + controlName + '"]');
+      if (badge) {
+        badge.className = "control-badge " + controlBadgeClass(viewState.state);
+        badge.textContent = viewState.label;
+        badge.title = viewState.detail || "";
+      }
+      if (detail) {
+        detail.textContent = viewState.detail || "Runtime control";
+      }
+      if (toggle) {
+        toggle.classList.toggle("is-on", Boolean(viewState.enabled));
+        toggle.setAttribute("aria-checked", viewState.enabled ? "true" : "false");
+        toggle.title = viewState.enabled ? "Turn off" : "Turn on";
+      }
+    }
+
+    function updateRuntimeControls(status) {
+      const pauses = (status.runtime_controls && status.runtime_controls.pauses) || {};
+      const delivery = status.delivery || {};
+      updateControlWidget(
+        "telegram",
+        "telegram_alerts",
+        controlViewState(pauses.telegram_alerts, delivery.telegram_alerts)
+      );
+      updateControlWidget("email", "email_reports", controlViewState(pauses.email_reports));
+      updateControlWidget("loggen", "log_generation", controlViewState(pauses.log_generation));
+
+      const config = status.config || {};
+      const values = (status.runtime_controls && status.runtime_controls.values) || {};
+      const interval = values.demo_log_interval_seconds || config.demo_log_interval_seconds || "";
+      setText("control-interval", interval ? String(interval) + "s" : "-");
+      const intervalInput = document.getElementById("control-interval-input");
+      if (intervalInput && document.activeElement !== intervalInput) {
+        intervalInput.value = interval || "";
+      }
+      updateTelegramMetrics(status.telegram_alert_metrics || {});
+    }
+
+    function updateTelegramMetrics(metrics) {
+      state.telegramMetrics = metrics || {};
+      const windows = state.telegramMetrics.windows || {};
+      const preferredWindow = state.telegramMetricsWindow || state.telegramMetrics.default_window || "today";
+      const selectedWindow = windows[preferredWindow] ? preferredWindow : (state.telegramMetrics.default_window || "today");
+      state.telegramMetricsWindow = selectedWindow;
+      const counts = windows[selectedWindow] || state.telegramMetrics;
+      setText("telegram-sent-count", String(counts.sent_total ?? 0));
+      setText("telegram-acked-count", String(counts.acknowledged ?? 0));
+      setText("telegram-pending-count", String(counts.pending ?? 0));
+      setText("telegram-escalated-count", String(counts.escalated ?? 0));
+      updateTelegramMetricWindowUi(selectedWindow, state.telegramMetrics);
+    }
+
+    function updateTelegramMetricWindowUi(selectedWindow, metrics) {
+      const labels = {
+        today: "Today",
+        "24h": "Last 24h",
+        "7d": "Last 7d",
+        all: "All time"
+      };
+      const timezone = metrics && metrics.timezone ? " / " + metrics.timezone : "";
+      setText("telegram-window-label", (labels[selectedWindow] || selectedWindow) + timezone);
+      document.querySelectorAll("[data-telegram-window]").forEach(function(button) {
+        const active = button.dataset.telegramWindow === selectedWindow;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+    }
+
+    function setRuntimeControlsBusy(value) {
+      document.querySelectorAll("[data-runtime-control], #control-interval-save, #control-interval-input, #telegram-reset-counters").forEach(function(element) {
+        element.disabled = value;
+      });
+    }
+
+    async function updateRuntimeControl(payload) {
+      setRuntimeControlsBusy(true);
+      try {
+        const response = await fetch("/runtime-controls", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || result.error || "Runtime control update failed");
+        }
+        await refreshStatus();
+      } catch (error) {
+        appendMessage("agent", "Không cập nhật được runtime control: " + error.message);
+      } finally {
+        setRuntimeControlsBusy(false);
+      }
+    }
+
+    async function resetTelegramCounters() {
+      const confirmed = window.confirm("Reset Telegram alert counters? This clears stored alert counter history only.");
+      if (!confirmed) {
+        return;
+      }
+      setRuntimeControlsBusy(true);
+      try {
+        const response = await fetch("/telegram-alert-counters/reset", {
+          method: "POST"
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || result.error || "Counter reset failed");
+        }
+        updateTelegramMetrics(result.telegram_alert_metrics || {});
+        appendMessage("agent", "Telegram counters reset. Cleared " + String(result.deleted_count || 0) + " stored alert records.");
+        await refreshStatus();
+      } catch (error) {
+        appendMessage("agent", "Could not reset Telegram counters: " + error.message);
+      } finally {
+        setRuntimeControlsBusy(false);
+      }
     }
 
     function severityClass(severity) {
@@ -1670,14 +2823,7 @@ CHAT_UI_HTML = r"""<!doctype html>
         setText("fact-timezone", config.app_timezone || "-");
         setText("fact-source", config.log_source_mode || "-");
 
-        const pauses = (status.runtime_controls && status.runtime_controls.pauses) || {};
-        document.getElementById("control-telegram").innerHTML = formatControl(pauses.telegram_alerts);
-        document.getElementById("control-email").innerHTML = formatControl(pauses.email_reports);
-        document.getElementById("control-loggen").innerHTML = formatControl(pauses.log_generation);
-
-        const values = (status.runtime_controls && status.runtime_controls.values) || {};
-        const interval = values.demo_log_interval_seconds || config.demo_log_interval_seconds || "-";
-        setText("control-interval", String(interval) + "s");
+        updateRuntimeControls(status);
 
         renderAlerts(status.top_alerts || []);
         renderDomainBars(status.domain_counts || {});
@@ -1704,6 +2850,42 @@ CHAT_UI_HTML = r"""<!doctype html>
     document.querySelectorAll("[data-prompt]").forEach(function(button) {
       button.addEventListener("click", function() {
         askAgent(button.dataset.prompt);
+      });
+    });
+
+    document.querySelectorAll("[data-runtime-control]").forEach(function(button) {
+      button.addEventListener("click", function() {
+        const currentlyEnabled = button.getAttribute("aria-checked") === "true";
+        updateRuntimeControl({
+          control: button.dataset.runtimeControl,
+          enabled: !currentlyEnabled
+        });
+      });
+    });
+
+    document.querySelectorAll("[data-telegram-window]").forEach(function(button) {
+      button.addEventListener("click", function() {
+        state.telegramMetricsWindow = button.dataset.telegramWindow || "today";
+        updateTelegramMetrics(state.telegramMetrics || {});
+      });
+    });
+
+    const telegramResetButton = document.getElementById("telegram-reset-counters");
+    if (telegramResetButton) {
+      telegramResetButton.addEventListener("click", resetTelegramCounters);
+    }
+
+    document.getElementById("control-interval-save").addEventListener("click", function() {
+      const input = document.getElementById("control-interval-input");
+      const seconds = Number(input.value);
+      if (!Number.isFinite(seconds) || seconds < 1 || seconds > 86400) {
+        appendMessage("agent", "Interval phải nằm trong khoảng 1 đến 86400 giây.");
+        input.focus();
+        return;
+      }
+      updateRuntimeControl({
+        setting: "demo_log_interval_seconds",
+        seconds: seconds
       });
     });
 
