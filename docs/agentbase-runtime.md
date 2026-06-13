@@ -154,7 +154,7 @@ Verified after v17 deployment:
 
 - `GET /health` returned `ok`.
 - `GET /status` returned `telegram_alert_metrics.windows`.
-- Telegram alert delivery state was `live`.
+- Telegram alert delivery is controlled by the Runtime Controls panel and can be toggled live before a realtime alert demo.
 - Runtime scheduler worker state was `running`.
 - Hosted UI contained the Telegram counter filter tabs and reset button.
 - Runtime container regression suite passed: `25 passed`.

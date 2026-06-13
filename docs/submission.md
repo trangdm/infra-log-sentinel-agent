@@ -64,7 +64,7 @@ Verified after deploying v17 on 2026-06-13:
 - `/status`: includes `telegram_alert_metrics.windows`
 - Default Telegram counter window: `today`
 - Runtime timezone: `Asia/Ho_Chi_Minh`
-- Telegram delivery state: `live`
+- Telegram delivery: controlled from the Runtime Controls panel; enable it before the realtime Telegram alert demo.
 - Runtime scheduler worker: `running`
 - UI includes `Today`, `24h`, `7d`, `All`, and `Reset`
 - Core regression test in runtime container: `25 passed`

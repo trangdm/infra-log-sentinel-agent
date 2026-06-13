@@ -32,7 +32,7 @@ The hosted demo runs in `runtime_folder` mode. It creates `/app/data/logs`, boot
 - Hosted endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`.
 - Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17`.
 - Runtime mode: `runtime_folder`, self-contained synthetic infrastructure log demo.
-- Verification on 2026-06-13: `/health` returned `ok`, `/status` returned `telegram_alert_metrics.windows`, Telegram alert delivery was `live`, and the runtime scheduler worker was `running`.
+- Verification on 2026-06-13: `/health` returned `ok`, `/status` returned `telegram_alert_metrics.windows`, runtime controls were available, and the runtime scheduler worker was `running`. Telegram alert delivery can be toggled live from the Runtime Controls panel before the realtime alert demo.
 
 For the copy-ready GreenNode submission packet, see `docs/submission.md`.
 
