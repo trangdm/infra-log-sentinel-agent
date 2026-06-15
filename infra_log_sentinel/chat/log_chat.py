@@ -153,9 +153,9 @@ def _score_events(
             continue
         if source_matches and event.source.lower() not in source_matches:
             continue
-        if event_type_terms and not any(term in haystack for term in event_type_terms):
-            continue
-        if phrase_terms and not any(term in haystack for term in phrase_terms):
+        event_type_match = any(term in haystack for term in event_type_terms)
+        phrase_match = any(term in haystack for term in phrase_terms)
+        if (event_type_terms or phrase_terms) and not (event_type_match or phrase_match):
             continue
 
         score = 0
@@ -274,13 +274,56 @@ def _event_type_terms(question: str) -> list[str]:
         "bgp": "routing_neighbor",
         "ospf": "routing_neighbor",
         "routing": "routing_neighbor",
+        "route": "routing_neighbor",
+        "neighbor": "routing_neighbor",
+        "payment subnet": "routing_neighbor",
         "interface": "interface",
+        "flap": "interface",
+        "flapping": "interface",
+        "link down": "interface",
+        "crc": "interface",
+        "fec": "interface",
         "disk": "storage",
+        "disk full": "capacity",
+        "no space": "capacity",
+        "logrotate": "capacity",
         "storage": "storage",
         "datastore": "capacity",
+        "snapshot": "snapshot",
+        "apd": "storage_path",
+        "all paths": "storage_path",
         "auth": "authentication",
         "login": "authentication",
+        "ssh": "authentication",
+        "brute": "authentication",
+        "brute force": "authentication",
+        "auth_failed": "authentication",
+        "authentication": "authentication",
+        "failed password": "authentication",
+        "sqlagent": "service",
+        "eventid=7031": "service",
+        "7031": "service",
+        "plugin": "plugin",
+        "dll": "dll",
         "service": "service",
+        "dns": "dns",
+        "named": "dns",
+        "resolver": "dns",
+        "query timeout": "dns",
+        "application timeout": "timeout",
+        "upstream timed out": "timeout",
+        "fortigate": "fortigate",
+        "firewall": "firewall",
+        "session": "session",
+        "sessions": "session",
+        "policy": "policy",
+        "deny": "deny",
+        "broadcast": "loop",
+        "loop": "loop",
+        "loopback": "loop",
+        "stp": "stp",
+        "mac": "mac",
+        "lacp": "lacp",
         "cpu": "resource",
         "memory": "resource",
         "resource": "resource",
@@ -311,6 +354,8 @@ def _message_phrase_terms(question: str) -> list[str]:
         "sqlagent service",
         "bgp notification",
         "mac address",
+        "auth_failed",
+        "failed password",
     ]
     for phrase in known_phrases:
         if phrase in question:

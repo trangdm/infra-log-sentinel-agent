@@ -22,7 +22,7 @@ from infra_log_sentinel.notifications.telegram_format import format_chat_reply_f
 from infra_log_sentinel.notifications.telegram_chat import process_telegram_chat_updates
 from infra_log_sentinel.notifications.telegram_sender import TelegramUpdate, format_alert_message
 from infra_log_sentinel.parsing.log_parser import parse_raw_line, parse_raw_lines
-from infra_log_sentinel.scheduler.runner import _run_job_safely
+from infra_log_sentinel.scheduler.runner import _run_job_safely, _schedule_daily_report_job
 from infra_log_sentinel.server import (
     _analyze_rca_incident,
     _analyze_current_logs_for_rca,
@@ -54,6 +54,8 @@ from infra_log_sentinel.state.runtime_control import (
     CONTROL_TELEGRAM_ALERTS,
     VALUE_DEMO_LOG_INTERVAL_SECONDS,
     VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
+    VALUE_REPORT_TIME,
+    VALUE_SCAN_INTERVAL_SECONDS,
     RuntimeControlStore,
 )
 from infra_log_sentinel.web_ui import render_chat_ui
@@ -623,6 +625,35 @@ def test_rca_chat_can_generate_incident_logs_before_analysis(tmp_path: Path) -> 
     assert "Mode: RCA from current parsed logs." not in answer
 
 
+def test_rca_command_requests_return_runbook_commands_not_full_rca(tmp_path: Path) -> None:
+    cases = [
+        ("broadcast_loop", "command de check RCA broadcast loop", "show interface"),
+        ("mac_flapping", "command de check RCA mac flapping", "show mac address-table"),
+        ("fortigate_session_spike", "command de check RCA Fortigate session spike", "diagnose sys session"),
+        ("dns_timeout", "command de check RCA DNS timeout", "systemctl status named"),
+        ("linux_disk_full", "command de check RCA linux disk full", "df -h"),
+        ("windows_service_crash", "command de check RCA SQLAgent service down", "Get-Service"),
+        ("vmware_datastore_full", "command de check RCA VMware datastore full snapshot", "Get-Datastore"),
+        ("interface_flapping", "command de check RCA interface flapping", "show interface"),
+        ("routing_issue", "command de check RCA routing payment subnet", "show ip bgp"),
+        ("brute_force_wazuh", "command de check RCA SSH brute force attack", "alerts.log"),
+    ]
+
+    for scenario, question, expected_command in cases:
+        settings = _settings(tmp_path / scenario)
+        _prepare_runtime_storage(settings)
+        generate_incident_log_lines(settings.log_root_path, scenario)
+
+        answer = answer_or_execute_chat(settings, question, dry_run=True, channel=scenario)
+
+        assert "command/check trong ngữ cảnh RCA" in answer
+        assert "Runbook command" in answer
+        assert expected_command in answer
+        assert "AIOps RCA Investigation" not in answer
+        assert "Event timeline:" not in answer
+        assert RcaIncidentStore(settings.state_db_path).latest() is None
+
+
 def test_log_rca_generator_api_analyzes_only_generated_incident_burst(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _prepare_runtime_storage(settings)
@@ -881,6 +912,18 @@ def test_web_ui_moves_rca_workspace_to_right_rail_tabs() -> None:
     assert 'id="new-chat"' in html
     assert "startNewChatSession" in html
     assert "let conversationId = getConversationId();" in html
+    assert 'id="quick-impact-select"' in html
+    assert "quickImpactSelect" in html
+    assert "VLAN 20 internet slow" in html
+    assert 'id="rca-history-list"' in html
+    assert "Impact / symptom + time" in html
+    assert "RCA_HISTORY_KEY" in html
+    assert "saveRcaHistory" in html
+    assert "loadRcaHistory" in html
+    assert "(entry && entry.impact) || analysis.impact" in html
+    assert "analysis.most_likely_root_cause || analysis.summary || entry.impact" not in html
+    assert "writeRcaHistory(history.slice(0, 5))" not in html
+    assert "JSON.stringify(history.slice(0, 5))" in html
     assert 'data-prompt="user bao service SQLAgent down' not in html
     assert '<input id="rca-lookback" type="number" min="0.25" max="168" step="0.25">' in html
     assert '<input id="rca-start" type="datetime-local">' in html
@@ -890,6 +933,15 @@ def test_web_ui_moves_rca_workspace_to_right_rail_tabs() -> None:
     assert 'data-runtime-control="incident_generation"' in html
     assert 'id="control-incident-interval-input"' in html
     assert "All RCA incident scenarios" in html
+    assert "Most Likely Root Cause" in html
+    assert "<h4>Evidence</h4>" in html
+    assert "<h4>Analyze</h4>" in html
+    assert "<h4>Action</h4>" in html
+    assert "Evidence & Action" not in html
+    assert "grid-template-columns: 1fr" in html
+    assert "rcaCommandCards" in html
+    assert "Chưa có log evidence được chọn." in html
+    assert "No log evidence selected yet." not in html
 
 
 def test_log_rca_api_accepts_focus_and_lookback(tmp_path: Path) -> None:
@@ -1139,6 +1191,40 @@ def test_scheduler_job_errors_are_logged_without_raising(monkeypatch) -> None:
     assert messages == ["Alert scan job failed: RuntimeError: telegram 409"]
 
 
+def test_daily_report_schedule_uses_configured_timezone(monkeypatch) -> None:
+    captured = {}
+
+    class FakeJob:
+        @property
+        def day(self):
+            return self
+
+        def at(self, report_time, timezone_name=None):
+            captured["report_time"] = report_time
+            captured["timezone_name"] = timezone_name
+            return self
+
+        def do(self, job):
+            captured["job"] = job
+            return self
+
+        def tag(self, tag_name):
+            captured["tag"] = tag_name
+            return self
+
+    class FakeSchedule:
+        def every(self):
+            return FakeJob()
+
+    monkeypatch.setattr("infra_log_sentinel.scheduler.runner.schedule", FakeSchedule())
+
+    _schedule_daily_report_job("09:00", "Asia/Ho_Chi_Minh", lambda: "ok")
+
+    assert captured["report_time"] == "09:00"
+    assert captured["timezone_name"] == "Asia/Ho_Chi_Minh"
+    assert captured["tag"] == "daily-report"
+
+
 def test_runtime_control_api_toggles_alerts_and_saves_interval(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _prepare_runtime_storage(settings)
@@ -1185,6 +1271,22 @@ def test_runtime_control_api_toggles_alerts_and_saves_interval(tmp_path: Path) -
 
     assert incident_interval["message"] == "Incident generator interval saved: 240s."
     assert RuntimeControlStore(settings.state_db_path).get_value(VALUE_INCIDENT_LOG_INTERVAL_SECONDS) == "240"
+
+    report_time = _update_runtime_control(
+        settings,
+        {"setting": VALUE_REPORT_TIME, "value": "18:30"},
+    )
+    assert report_time["message"] == "Report time saved: 18:30."
+    assert report_time["status"]["config"]["report_time"] == "18:30"
+    assert RuntimeControlStore(settings.state_db_path).get_value(VALUE_REPORT_TIME) == "18:30"
+
+    scan_interval = _update_runtime_control(
+        settings,
+        {"setting": VALUE_SCAN_INTERVAL_SECONDS, "seconds": 45},
+    )
+    assert scan_interval["message"] == "Scan interval saved: 45s."
+    assert scan_interval["status"]["config"]["scan_interval_seconds"] == 45
+    assert RuntimeControlStore(settings.state_db_path).get_value(VALUE_SCAN_INTERVAL_SECONDS) == "45"
 
 
 def test_runtime_extracts_last_chat_message() -> None:

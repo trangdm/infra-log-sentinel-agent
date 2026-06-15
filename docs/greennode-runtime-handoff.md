@@ -12,16 +12,16 @@ Greennode fixed the overloaded runtime infrastructure. The main hosted runtime w
 Runtime ID:      runtime-a864917b-1a16-4083-a64c-82f4e79f6602
 Endpoint ID:     endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9
 Endpoint:        https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
-Image:           vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35
-Image digest:    sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b
-Endpoint version: 33
+Image:           vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40
+Image digest:    sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe
+Endpoint version: 38
 Runtime status:  ACTIVE
 Endpoint status: ACTIVE
 Replicas:        1
 Health:          ok
 ```
 
-Hosted RCA smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, and `llm_guidance=true`.
+Hosted UI smoke confirmed the Log & RCA chat workspace with left-panel Recents chat history, Quick action and Quick impact dropdowns, RCA history showing Impact/symptom plus time, vertical RCA result blocks, Vietnamese RCA explanations, Action command cards, and timezone-labeled report time. Hosted chat smoke confirmed RCA command/check questions return runbook commands instead of full RCA reports.
 
 ## Current Code State
 

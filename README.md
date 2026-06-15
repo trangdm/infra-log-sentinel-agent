@@ -82,11 +82,11 @@ Invoke-WebRequest `
 - Repository: `https://github.com/trangdm/infra-log-sentinel-agent`.
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`.
 - Hosted endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`.
-- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`.
-- Submitted runtime image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`.
-- Endpoint version: `33`.
+- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`.
+- Submitted runtime image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`.
+- Endpoint version: `38`.
 - Runtime mode: `runtime_folder`, self-contained synthetic infrastructure log demo.
-- Verification on 2026-06-15: runtime `ACTIVE`, endpoint `ACTIVE`, replica count `1`, `/health` returned `ok`, `/status` returned `ok` in `runtime_folder` mode, hosted RCA insufficient-data smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, and the local regression suite passed with `51 passed`.
+- Verification on 2026-06-15: runtime `ACTIVE`, endpoint `ACTIVE`, replica count `1`, `/health` returned `ok`, `/status` returned `ok` in `runtime_folder` mode, hosted UI served the Log & RCA chat workspace with Recents chat history, Quick action and Quick impact dropdowns, RCA history showing Impact/symptom plus time, vertical RCA result blocks, Vietnamese RCA output, and command details in Action; RCA command/check questions now return runbook commands instead of full RCA reports; daily report scheduling uses `Asia/Ho_Chi_Minh`; local regression suite passed with `53 passed`.
 
 For the copy-ready GreenNode submission packet, see `docs/submission.md`.
 

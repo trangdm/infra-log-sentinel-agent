@@ -14,6 +14,8 @@ CONTROL_LOG_GENERATION = "log_generation"
 CONTROL_INCIDENT_GENERATION = "incident_generation"
 VALUE_DEMO_LOG_INTERVAL_SECONDS = "demo_log_interval_seconds"
 VALUE_INCIDENT_LOG_INTERVAL_SECONDS = "incident_log_interval_seconds"
+VALUE_REPORT_TIME = "report_time"
+VALUE_SCAN_INTERVAL_SECONDS = "scan_interval_seconds"
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,8 @@ class RuntimeControlStore:
             "values": {
                 VALUE_DEMO_LOG_INTERVAL_SECONDS: self.get_value(VALUE_DEMO_LOG_INTERVAL_SECONDS),
                 VALUE_INCIDENT_LOG_INTERVAL_SECONDS: self.get_value(VALUE_INCIDENT_LOG_INTERVAL_SECONDS),
+                VALUE_REPORT_TIME: self.get_value(VALUE_REPORT_TIME),
+                VALUE_SCAN_INTERVAL_SECONDS: self.get_value(VALUE_SCAN_INTERVAL_SECONDS),
             },
         }
 

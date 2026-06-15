@@ -51,6 +51,8 @@ from infra_log_sentinel.state.runtime_control import (
     CONTROL_TELEGRAM_ALERTS,
     VALUE_DEMO_LOG_INTERVAL_SECONDS,
     VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
+    VALUE_REPORT_TIME,
+    VALUE_SCAN_INTERVAL_SECONDS,
     RuntimeControlStore,
 )
 from infra_log_sentinel.web_ui import render_chat_ui
@@ -407,6 +409,31 @@ def _update_runtime_control(settings: Settings, payload: dict[str, Any]) -> dict
             "status": _build_status(settings),
         }
 
+    if setting == VALUE_REPORT_TIME:
+        report_time = _normalize_report_time(payload.get("value") or payload.get("report_time"))
+        if report_time is None:
+            raise ValueError("Report time update requires value formatted as HH:MM.")
+        store.set_value(VALUE_REPORT_TIME, report_time)
+        return {
+            "service": SERVICE_NAME,
+            "message": f"Report time saved: {report_time}.",
+            "status": _build_status(settings),
+        }
+
+    if setting == VALUE_SCAN_INTERVAL_SECONDS:
+        seconds = _payload_float(payload.get("seconds"))
+        if seconds is None:
+            raise ValueError("Scan interval update requires numeric field: seconds.")
+        if seconds < 1 or seconds > 86400:
+            raise ValueError("Scan interval must be between 1 and 86400 seconds.")
+        stored_value = str(int(seconds)) if seconds.is_integer() else f"{seconds:g}"
+        store.set_value(VALUE_SCAN_INTERVAL_SECONDS, stored_value)
+        return {
+            "service": SERVICE_NAME,
+            "message": f"Scan interval saved: {stored_value}s.",
+            "status": _build_status(settings),
+        }
+
     raise ValueError("Request must include a supported control or setting.")
 
 
@@ -433,6 +460,16 @@ def _payload_float(value: Any) -> float | None:
         except ValueError:
             return None
     return None
+
+
+def _normalize_report_time(value: Any) -> str | None:
+    text = _payload_text(value)
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%H:%M").strftime("%H:%M")
+    except ValueError:
+        return None
 
 
 def _generate_rca_incident(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
@@ -719,7 +756,7 @@ def _build_status(settings: Settings) -> dict[str, Any]:
             "status": "degraded",
             "service": SERVICE_NAME,
             "error": str(exc),
-            "config": _safe_config(settings),
+            "config": _safe_config(settings, runtime_controls),
             "runtime_controls": runtime_controls,
             "workers": workers,
             "delivery": _delivery_status(settings, runtime_controls, workers),
@@ -746,7 +783,7 @@ def _build_status(settings: Settings) -> dict[str, Any]:
     return {
         "status": "ok",
         "service": SERVICE_NAME,
-        "config": _safe_config(settings),
+        "config": _safe_config(settings, runtime_controls),
         "runtime_controls": runtime_controls,
         "workers": workers,
         "delivery": _delivery_status(settings, runtime_controls, workers),
@@ -760,15 +797,21 @@ def _build_status(settings: Settings) -> dict[str, Any]:
     }
 
 
-def _safe_config(settings: Settings) -> dict[str, Any]:
+def _safe_config(settings: Settings, runtime_controls: dict[str, Any] | None = None) -> dict[str, Any]:
+    values = {}
+    if isinstance(runtime_controls, dict) and isinstance(runtime_controls.get("values"), dict):
+        values = runtime_controls["values"]
+    report_time = _normalize_report_time(values.get(VALUE_REPORT_TIME)) or settings.report_time
+    scan_interval = _payload_float(values.get(VALUE_SCAN_INTERVAL_SECONDS))
+    scan_interval_seconds = int(scan_interval) if scan_interval and scan_interval >= 1 else settings.scan_interval_seconds
     return {
         "app_env": settings.app_env,
         "app_timezone": settings.app_timezone,
         "log_source_mode": settings.log_source_mode,
         "log_root_path": str(settings.log_root_path),
-        "report_time": settings.report_time,
+        "report_time": report_time,
         "report_lookback_hours": settings.report_lookback_hours,
-        "scan_interval_seconds": settings.scan_interval_seconds,
+        "scan_interval_seconds": scan_interval_seconds,
         "severity_alert_levels": list(settings.severity_alert_levels),
         "runtime_log_bootstrap_enabled": settings.runtime_log_bootstrap_enabled,
         "demo_log_bootstrap_count": settings.demo_log_bootstrap_count,

@@ -35,9 +35,9 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 ## Runtime
 
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
-- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`
-- Runtime image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`
-- Endpoint version: `33`
+- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`
+- Runtime image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`
+- Endpoint version: `38`
 - Runtime status: `ACTIVE`
 - Endpoint status: `ACTIVE`
 - Current replicas: `1`
@@ -77,12 +77,17 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 
 ## Verification
 
-Verified after deploying v35 on 2026-06-15:
+Verified after deploying v40 on 2026-06-15:
 
 - `/health`: `ok`
 - `/status`: `ok`, runtime mode `runtime_folder`
 - Hosted RCA insufficient-data smoke: `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, `llm_guidance=true`
-- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `33`, replica count `1`
+- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `38`, replica count `1`
+- Hosted UI: Chat Agent shows `Infrastructure Log & RCA Intelligence`, Recents chat history in the left panel, Quick action and Quick impact dropdowns, RCA history in the left panel showing Impact/symptom plus time, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
+- RCA chat intent routing: full RCA analysis requests still return RCA reports, while RCA command/check/runbook requests return relevant runbook commands across all generated RCA scenarios.
+- RCA output uses Vietnamese explanatory text while preserving log identifiers, event types, commands, and technical terms in English.
+- RCA Action includes detailed command cards for log inspection, service checks, and platform-specific validation.
+- Daily report scheduler registers `REPORT_TIME` in `Asia/Ho_Chi_Minh` instead of container UTC.
 - Runtime timezone: `Asia/Ho_Chi_Minh`
 - Telegram delivery: controlled from the Runtime Controls panel; enable it before the realtime Telegram alert demo.
 - UI includes separate right-panel `Log Sentinel` and `RCA` tabs

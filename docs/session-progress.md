@@ -16,7 +16,7 @@ Use case:
 - Send one-way Telegram alert notifications for warning/error/critical events.
 - Provide an RCA workspace for impact/window/scenario-driven diagnosis.
 
-Current note: ACK/escalation and Telegram alert counters were retired in v20. v21 moved RCA into a dedicated right-panel tab and added MiniMax next-step guidance when log evidence is insufficient. v22 expands the log generator/parser to Fortigate, Juniper, Aruba, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style sources. v23 compacts RCA chat answers, adds explicit New chat context reset, and adds RCA workspace Clear. v24 adds an all-scenario incident log generator runtime control and removes scenario generation from the RCA panel. v25 makes RCA current-log search focus-aware so user symptoms such as Fortigate session spike are prioritized over unrelated critical events. v26 keeps the RCA workspace's latest focused result in browser state so background status refreshes cannot overwrite it. v35 was redeployed after GreenNode fixed the overloaded runtime infrastructure; the main runtime and endpoint are ACTIVE. Older entries below are historical progress notes, not current product scope.
+Current note: ACK/escalation and Telegram alert counters were retired in v20. v21 moved RCA into a dedicated right-panel tab and added MiniMax next-step guidance when log evidence is insufficient. v22 expands the log generator/parser to Fortigate, Juniper, Aruba, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style sources. v23 compacts RCA chat answers, adds explicit New chat context reset, and adds RCA workspace Clear. v24 adds an all-scenario incident log generator runtime control and removes scenario generation from the RCA panel. v25 makes RCA current-log search focus-aware so user symptoms such as Fortigate session spike are prioritized over unrelated critical events. v26 keeps the RCA workspace's latest focused result in browser state so background status refreshes cannot overwrite it. v40 is deployed on the main runtime with RCA intent routing for analyze vs command/check questions across all generated RCA cases, RCA history showing Impact/symptom plus time, the desktop dashboard-style UI, Log & RCA chat workspace, left-panel Recents chat history, Quick action and Quick impact dropdowns, vertical RCA result blocks, Vietnamese RCA explanations, command details in Action, editable report time, editable scan interval, and timezone-correct daily report scheduling. Older entries below are historical progress notes, not current product scope.
 
 ## Workspace
 
@@ -73,9 +73,9 @@ Final hosted runtime:
 ```text
 Runtime ID: runtime-a864917b-1a16-4083-a64c-82f4e79f6602
 Endpoint: https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
-Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35
-Image digest: sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b
-Endpoint version: 33
+Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40
+Image digest: sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe
+Endpoint version: 38
 Runtime status: ACTIVE
 Endpoint status: ACTIVE
 Current replicas: 1

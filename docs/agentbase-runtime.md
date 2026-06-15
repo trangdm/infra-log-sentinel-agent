@@ -131,9 +131,9 @@ Completed:
 - Deployed GreenNode AgentBase runtime:
   - Runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
   - Endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
-  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`
-  - Image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`
-  - Endpoint version: `33`
+  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`
+  - Image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`
+  - Endpoint version: `38`
   - Runtime status: `ACTIVE`
   - Endpoint status: `ACTIVE`
   - Current replicas: `1`
@@ -152,11 +152,16 @@ Completed:
   - Alert scan job exception isolation.
 - Telegram alerts are one-way notifications; ACK/escalation and alert counter cards are retired.
 
-Verified after v35 deployment on 2026-06-15:
+Verified after v40 deployment on 2026-06-15:
 
 - `GET /health` returned `ok`.
 - `GET /status` returned `ok` in `runtime_folder` mode.
 - Hosted RCA insufficient-data smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, and `llm_guidance=true`.
+- Hosted UI serves the Log & RCA chat workspace with Recents chat history in the left panel, Quick action and Quick impact dropdowns, RCA history showing Impact/symptom plus time, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
+- RCA chat intent routing distinguishes full RCA analysis requests from RCA command/check/runbook requests across all generated RCA cases; command/check questions return runbook commands instead of full RCA reports.
+- RCA output uses Vietnamese explanatory text while preserving log identifiers, event types, commands, and technical terms in English.
+- RCA Action includes detailed command cards for log inspection, service checks, and platform-specific validation.
+- Daily report scheduler registers `REPORT_TIME` in `Asia/Ho_Chi_Minh` instead of container UTC.
 - Telegram alert delivery is controlled by the Runtime Controls panel and can be toggled live before a realtime alert demo.
 - Hosted UI exposes separate right-panel `Log Sentinel` and `RCA` tabs.
 - RCA workspace no longer occupies the chat conversation space.
@@ -166,7 +171,7 @@ Verified after v35 deployment on 2026-06-15:
 - RCA workspace now analyzes current logs only; incident generation is controlled from Runtime Controls.
 - RCA current-log analysis now prioritizes the user-provided symptom/focus before unrelated critical events.
 - RCA workspace keeps the user's latest focused analysis in browser state so `/status` refreshes cannot overwrite it.
-- Runtime container regression suite passed locally: `51 passed`.
+- Runtime container regression suite passed locally: `52 passed`.
 
 ## Runtime contract
 

@@ -41,6 +41,13 @@ def recommend_commands(event: LogEvent) -> list[DiagnosticCommand]:
     if event_type == "firewall_deny":
         src_ip = entities.get("src_ip", "<source-ip>")
         dst_ip = entities.get("dst_ip", "<destination-ip>")
+        if domain == "fortigate":
+            return [
+                _cmd("Verify", f"diagnose firewall iprope lookup 100004 {src_ip} 0 {dst_ip} 443 6", "Check Fortigate policy lookup for the denied flow."),
+                _cmd("Investigate", f"diagnose sniffer packet any 'host {src_ip} or host {dst_ip}' 4 50", "Sample packets for the affected source/destination."),
+                _cmd("Investigate", f"diagnose sys session filter src {src_ip} ; diagnose sys session list", "Inspect sessions from the source IP."),
+                _cmd("Remediate", "review Fortigate policy hit count and approved change request before editing policy", "Avoid policy changes until expected traffic is validated."),
+            ]
         return [
             _cmd("Verify", f"show access-list | include {src_ip}|{dst_ip}", "Find the ACL entry matching the flow."),
             _cmd("Investigate", f"packet-tracer input outside tcp {src_ip} 443 {dst_ip} 50432", "Simulate ASA policy decision for the denied traffic."),
@@ -69,6 +76,14 @@ def recommend_commands(event: LogEvent) -> list[DiagnosticCommand]:
     if event_type == "authentication_failure":
         user = entities.get("user", "<user>")
         src_ip = entities.get("src_ip", entities.get("ip", "<source-ip>"))
+        if domain == "wazuh":
+            return [
+                _cmd("Verify", f"sudo grep -E 'auth_failed|sshd|{src_ip}' /var/ossec/logs/alerts/alerts.log | tail -80", "Check Wazuh alert evidence for SSH authentication failures."),
+                _cmd("Investigate", f"sudo grep '{src_ip}' /var/ossec/logs/alerts/alerts.json | tail -20", "Review source IP context and rule metadata."),
+                _cmd("Investigate", f"sudo grep -R '{user}' /var/ossec/logs/alerts/ -n | tail -50", "Correlate repeated failures for the same account."),
+                _cmd("Investigate", f"sudo grep '{src_ip}' /var/log/auth.log | tail -50", "Validate raw SSH failures on the affected Linux host when available."),
+                _cmd("Remediate", f"block source {src_ip} at firewall/WAF after confirming abuse", "Contain brute-force traffic only after validating the source and business impact."),
+            ]
         if domain == "network":
             return [
                 _cmd("Verify", f"show logging | include {user}|{src_ip}", "Find related VPN or device authentication events."),
@@ -104,6 +119,25 @@ def recommend_commands(event: LogEvent) -> list[DiagnosticCommand]:
             _cmd("Investigate", "sudo du -xh / | sort -h | tail -20", "Find largest directories."),
             _cmd("Investigate", "sudo journalctl --disk-usage", "Check journal space usage."),
             _cmd("Remediate", "sudo journalctl --vacuum-time=14d", "Trim old journal logs when approved."),
+        ]
+
+    if event_type == "dns_timeout":
+        domain_name = entities.get("domain", "app.example.local")
+        return [
+            _cmd("Verify", "systemctl status named systemd-resolved --no-pager", "Check DNS resolver service health."),
+            _cmd("Investigate", "journalctl -u named -u systemd-resolved --since '1 hour ago' --no-pager | tail -120", "Review resolver errors around the impact window."),
+            _cmd("Investigate", f"dig @{event.source or '127.0.0.1'} {domain_name} +time=2 +tries=1", "Measure DNS response from the affected resolver."),
+            _cmd("Investigate", "rndc status && rndc recursing", "Check BIND recursion load when rndc is available."),
+            _cmd("Remediate", "reduce DNS debug logging or fail over clients to secondary resolver after validation", "Lower resolver load without masking the root cause."),
+        ]
+
+    if event_type == "application_timeout":
+        return [
+            _cmd("Verify", "curl -vk --max-time 5 https://app.example.local/health", "Check application reachability from a client path."),
+            _cmd("Investigate", "journalctl -u nginx --since '1 hour ago' --no-pager | tail -120", "Review web proxy timeout logs."),
+            _cmd("Investigate", "ss -antp | grep -E ':80|:443' | head -80", "Inspect active web/backend connections."),
+            _cmd("Investigate", "dig app.example.local +time=2 +tries=1", "Validate whether DNS resolution contributes to the timeout."),
+            _cmd("Remediate", "restart or fail over the impacted app tier only after dependency health is confirmed", "Avoid restarting the symptom tier before checking DNS/network dependencies."),
         ]
 
     if event_type == "service_failure":
@@ -162,6 +196,14 @@ def recommend_commands(event: LogEvent) -> list[DiagnosticCommand]:
                 _cmd("Verify", "show memory statistics", "Check memory pressure."),
                 _cmd("Investigate", "show platform resources", "Review hardware forwarding/control-plane usage."),
                 _cmd("Remediate", "shift traffic or rate-limit abusive flows after validation", "Reduce pressure while root cause is investigated."),
+            ]
+        if domain == "fortigate":
+            return [
+                _cmd("Verify", "get system performance status", "Check Fortigate CPU, memory, session, and uptime counters."),
+                _cmd("Verify", "diagnose sys session stat", "Validate current session table pressure."),
+                _cmd("Investigate", "diagnose sys top 5 20", "Identify high CPU processes."),
+                _cmd("Investigate", "diagnose firewall iprope stats | head -80", "Check policy/session processing pressure."),
+                _cmd("Remediate", "rate-limit or narrow the abnormal source/policy after confirming business impact", "Reduce firewall pressure without cutting legitimate traffic."),
             ]
         if domain == "vmware":
             host = event.source or entities.get("host", "<esxi-host>")

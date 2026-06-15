@@ -19,6 +19,8 @@ from infra_log_sentinel.state.runtime_control import (
     CONTROL_EMAIL_REPORTS,
     CONTROL_TELEGRAM_ALERTS,
     RuntimeControlStore,
+    VALUE_REPORT_TIME,
+    VALUE_SCAN_INTERVAL_SECONDS,
 )
 
 
@@ -58,27 +60,73 @@ def run_scheduler_forever(
     dry_run: bool = False,
     max_alerts: int | None = None,
 ) -> None:
-    print(
-        "Scheduler started. "
-        f"Daily report at {settings.report_time}; "
-        f"scan interval {settings.scan_interval_seconds}s."
-    )
+    control_store = RuntimeControlStore(settings.state_db_path)
+    current_report_time = ""
+    current_scan_interval = 0
 
-    schedule.every().day.at(settings.report_time).do(
-        lambda: _run_job_safely(
-            "Daily report job",
-            lambda: run_daily_report(settings=settings, dry_run=dry_run),
+    def sync_scheduler_jobs() -> None:
+        nonlocal current_report_time, current_scan_interval
+        report_time = _runtime_report_time(control_store, settings)
+        scan_interval = _runtime_scan_interval_seconds(control_store, settings)
+        if report_time == current_report_time and scan_interval == current_scan_interval:
+            return
+        schedule.clear("daily-report")
+        schedule.clear("alert-scan")
+        _schedule_daily_report_job(
+            report_time=report_time,
+            timezone_name=settings.app_timezone,
+            job=lambda: _run_job_safely(
+                "Daily report job",
+                lambda: run_daily_report(settings=settings, dry_run=dry_run),
+            ),
         )
-    )
-    schedule.every(settings.scan_interval_seconds).seconds.do(
-        lambda: _run_job_safely(
-            "Alert scan job",
-            lambda: run_alert_scan(settings=settings, dry_run=dry_run, max_alerts=max_alerts),
+        schedule.every(scan_interval).seconds.do(
+            lambda: _run_job_safely(
+                "Alert scan job",
+                lambda: run_alert_scan(settings=settings, dry_run=dry_run, max_alerts=max_alerts),
+            )
+        ).tag("alert-scan")
+        current_report_time = report_time
+        current_scan_interval = scan_interval
+        print(
+            "Scheduler configured. "
+            f"Daily report at {report_time} {settings.app_timezone}; "
+            f"scan interval {scan_interval}s.",
+            flush=True,
         )
-    )
+
+    sync_scheduler_jobs()
     while True:
+        sync_scheduler_jobs()
         schedule.run_pending()
         time.sleep(1)
+
+
+def _runtime_report_time(control_store: RuntimeControlStore, settings: Settings) -> str:
+    value = control_store.get_value(VALUE_REPORT_TIME)
+    if value:
+        try:
+            datetime.strptime(value, "%H:%M")
+            return value
+        except ValueError:
+            pass
+    return settings.report_time
+
+
+def _schedule_daily_report_job(report_time: str, timezone_name: str, job) -> None:
+    schedule.every().day.at(report_time, timezone_name).do(job).tag("daily-report")
+
+
+def _runtime_scan_interval_seconds(control_store: RuntimeControlStore, settings: Settings) -> int:
+    value = control_store.get_value(VALUE_SCAN_INTERVAL_SECONDS)
+    if value:
+        try:
+            seconds = int(float(value))
+        except ValueError:
+            seconds = settings.scan_interval_seconds
+        if 1 <= seconds <= 86400:
+            return seconds
+    return settings.scan_interval_seconds
 
 
 def run_daily_report(settings: Settings, dry_run: bool = False) -> str:

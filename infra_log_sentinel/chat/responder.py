@@ -85,6 +85,21 @@ def answer_or_execute_chat(
             intent=intent.kind,
         )
 
+    rca_command_answer = _answer_rca_command_if_requested(
+        events=events,
+        question=question,
+        alert_levels=settings.severity_alert_levels,
+    )
+    if rca_command_answer:
+        return _remember_and_return(
+            conversation_store=conversation_store,
+            channel=conversation_channel,
+            question=question,
+            answer=rca_command_answer,
+            intent=intent.kind,
+            action="rca_command",
+        )
+
     rca_answer = _answer_rca_if_requested(
         settings=settings,
         events=events,
@@ -429,6 +444,58 @@ def _fallback_rca_guidance(analysis: dict[str, object]) -> str:
         f"{missing_lines}"
         "\n- Bước tiếp theo an toàn: mở rộng time window, đối chiếu log/metrics theo cùng timestamp, xác nhận impact với service owner rồi chạy lại RCA."
     )
+
+
+def _answer_rca_command_if_requested(
+    events: list[LogEvent],
+    question: str,
+    alert_levels: tuple[str, ...],
+) -> str:
+    q = normalize_text(question)
+    if not _looks_like_rca_command_request(q):
+        return ""
+    answer = answer_log_question(events, question, alert_levels)
+    if answer.startswith("AIOps RCA Investigation"):
+        return ""
+    return (
+        "Mình hiểu câu này là yêu cầu command/check trong ngữ cảnh RCA, "
+        "không phải yêu cầu chạy lại full RCA investigation.\n\n"
+        f"{answer}"
+    )
+
+
+def _looks_like_rca_command_request(q: str) -> bool:
+    if not _looks_like_rca_request(q):
+        return False
+    if any(term in q for term in ("command", "lenh", "runbook")):
+        return True
+    check_terms = ("check", "kiem tra", "verify", "investigate", "troubleshoot")
+    technical_terms = (
+        "broadcast",
+        "loop",
+        "mac",
+        "flapping",
+        "ssh",
+        "brute",
+        "wazuh",
+        "dns",
+        "named",
+        "fortigate",
+        "firewall",
+        "session",
+        "sqlagent",
+        "service",
+        "disk",
+        "linux",
+        "windows",
+        "vmware",
+        "routing",
+        "route",
+        "datastore",
+        "snapshot",
+        "interface",
+    )
+    return any(term in q for term in check_terms) and any(term in q for term in technical_terms)
 
 
 def _looks_like_rca_request(q: str) -> bool:
