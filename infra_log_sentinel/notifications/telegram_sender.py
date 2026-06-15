@@ -12,13 +12,12 @@ from requests import exceptions as requests_exceptions
 from infra_log_sentinel.analysis.runbook import recommend_commands
 from infra_log_sentinel.config import Settings
 from infra_log_sentinel.models import LogEvent
-from infra_log_sentinel.state.alert_store import AlertRecord, AlertStore, build_alert_id
+from infra_log_sentinel.state.alert_store import build_alert_id
 
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
 TELEGRAM_TIMEOUT = (10, 45)
 TELEGRAM_RETRIES = 2
-ACK_TIME_GRACE_SECONDS = 120
 _GET_UPDATES_LOCK = threading.Lock()
 PLACEHOLDER_VALUES = {
     "",
@@ -62,15 +61,6 @@ class TelegramUpdate:
     text: str
     message_id: int | None = None
     reply_to_message_id: int | None = None
-
-
-@dataclass(frozen=True)
-class AckEscalationResult:
-    acked_count: int
-    escalated_count: int
-    pending_count: int
-    dry_run: bool
-    message: str
 
 
 def check_telegram_health(settings: Settings) -> str:
@@ -143,7 +133,6 @@ def send_telegram_alerts(
     events: list[LogEvent],
     dry_run: bool = False,
     max_alerts: int | None = None,
-    alert_store: AlertStore | None = None,
 ) -> TelegramSendResult:
     token = settings.telegram_bot_token.strip()
     chat_id = settings.telegram_chat_id.strip()
@@ -171,143 +160,19 @@ def send_telegram_alerts(
         )
 
     sent_count = 0
-    skipped_count = 0
     for index, event in enumerate(alert_events, start=1):
         alert_id = build_alert_id(event)
-        if alert_store is not None and alert_store.get_alert_status(alert_id) is not None:
-            skipped_count += 1
-            continue
-        message_id = _send_message(
+        _send_message(
             token=token,
             chat_id=chat_id,
             text=format_alert_message(event, index, len(alert_events), alert_id),
         )
-        if alert_store is not None:
-            sent_at_ts = int(time.time())
-            alert_store.upsert_pending_alert(
-                event=event,
-                telegram_message_id=message_id,
-                sent_at_ts=sent_at_ts,
-                due_at_ts=sent_at_ts + settings.escalation_timeout_seconds,
-            )
         sent_count += 1
 
-    tracking_note = " Tracking pending ACK state." if alert_store is not None else ""
-    skipped_note = f" Skipped {skipped_count} previously tracked alert(s)." if skipped_count else ""
     return TelegramSendResult(
         sent_count=sent_count,
         dry_run=False,
-        message=(
-            f"Telegram alert delivery complete. Sent {sent_count} alert message(s)."
-            f"{skipped_note}{tracking_note}"
-        ),
-    )
-
-
-def check_ack_and_escalations(
-    settings: Settings,
-    alert_store: AlertStore,
-    dry_run: bool = False,
-    max_escalations: int | None = None,
-    force_escalate: bool = False,
-) -> AckEscalationResult:
-    token = settings.telegram_bot_token.strip()
-    chat_id = settings.telegram_chat_id.strip()
-    config_errors = _config_errors(token, chat_id)
-    if config_errors and not dry_run:
-        raise TelegramConfigError("Invalid Telegram configuration: " + ", ".join(config_errors))
-
-    pending_alerts = alert_store.list_pending_alerts()
-    if not pending_alerts:
-        return AckEscalationResult(
-            acked_count=0,
-            escalated_count=0,
-            pending_count=0,
-            dry_run=dry_run,
-            message="No pending alerts found.",
-        )
-
-    last_update_id = alert_store.get_ack_update_id()
-    updates = _fetch_updates(
-        token=token,
-        chat_id=chat_id,
-        offset=None if last_update_id is None else last_update_id + 1,
-        timeout_seconds=0,
-    )
-
-    pending_by_id = {alert.alert_id: alert for alert in pending_alerts}
-    acked_ids: set[str] = set()
-    max_update_id = last_update_id
-
-    for update in updates:
-        if max_update_id is None or update.update_id > max_update_id:
-            max_update_id = update.update_id
-        target_ids = _target_alert_ids_for_ack(
-            update.text,
-            update.message_date_ts,
-            pending_by_id,
-            reply_to_message_id=update.reply_to_message_id,
-        )
-        for alert_id in target_ids:
-            if alert_id in acked_ids:
-                continue
-            acked_ids.add(alert_id)
-            if not dry_run:
-                alert_store.mark_acknowledged(
-                    alert_id=alert_id,
-                    ack_text=update.text,
-                    acked_at_ts=update.message_date_ts,
-                    update_id=update.update_id,
-                )
-
-    now_ts = int(time.time())
-    remaining_pending = (
-        [alert for alert in alert_store.list_pending_alerts() if alert.alert_id not in acked_ids]
-        if not dry_run
-        else [alert for alert in pending_alerts if alert.alert_id not in acked_ids]
-    )
-    expired_alerts = [
-        alert for alert in remaining_pending if force_escalate or alert.due_at_ts <= now_ts
-    ]
-    if max_escalations is not None:
-        expired_alerts = expired_alerts[:max_escalations]
-
-    escalation_preview = ""
-    escalated_count = 0
-    for alert in expired_alerts:
-        escalation_text = format_escalation_message(alert)
-        if dry_run:
-            if not escalation_preview:
-                escalation_preview = f"\n\nEscalation preview:\n{escalation_text}"
-        else:
-            message_id = _send_message(token=token, chat_id=chat_id, text=escalation_text)
-            alert_store.mark_escalated(
-                alert_id=alert.alert_id,
-                escalated_at_ts=now_ts,
-                escalation_message_id=message_id,
-            )
-        escalated_count += 1
-
-    if max_update_id is not None and not dry_run:
-        alert_store.set_ack_update_id(max_update_id)
-
-    pending_count = (
-        max(0, len(pending_alerts) - len(acked_ids))
-        if dry_run
-        else max(0, len(pending_alerts) - len(acked_ids) - escalated_count)
-    )
-    ack_word = "would ACK" if dry_run else "ACKed"
-    escalation_word = "would escalate" if dry_run else "escalated"
-    return AckEscalationResult(
-        acked_count=len(acked_ids),
-        escalated_count=escalated_count,
-        pending_count=pending_count,
-        dry_run=dry_run,
-        message=(
-            f"ACK/escalation check complete. {ack_word} {len(acked_ids)}, "
-            f"{escalation_word} {escalated_count}, still pending {pending_count}."
-            f"{escalation_preview}"
-        ),
+        message=f"Telegram alert delivery complete. Sent {sent_count} alert message(s).",
     )
 
 
@@ -344,27 +209,6 @@ def format_alert_message(event: LogEvent, index: int, total: int, alert_id: str)
             "",
             "🔎 <b>Commands to run</b>",
             *command_lines,
-            "",
-            "✅ Reply <b>ACK</b>, or any message, to acknowledge before escalation timeout.",
-        ]
-    )
-
-
-def format_escalation_message(alert: AlertRecord) -> str:
-    return "\n".join(
-        [
-            "🔴 <b>[ESCALATE] Infrastructure Log Sentinel</b>",
-            f"<b>Alert ID:</b> <code>{escape(alert.alert_id)}</code>",
-            f"<b>Severity:</b> {SEVERITY_BADGE.get(alert.severity, alert.severity.upper())}",
-            f"<b>Domain:</b> {DOMAIN_BADGE.get(alert.domain, alert.domain)}",
-            f"<b>Source:</b> <code>{escape(alert.source)}</code>",
-            f"<b>Type:</b> <code>{escape(alert.event_type)}</code>",
-            "",
-            f"📌 <b>Summary</b>\n{escape(_trim(alert.message, 650))}",
-            f"💥 <b>Impact</b>\n{escape(alert.impact)}",
-            f"🛠 <b>Solution</b>\n{escape(alert.recommended_action)}",
-            "",
-            "⏱ No ACK was received within the escalation timeout. Immediate review is recommended.",
         ]
     )
 
@@ -441,36 +285,6 @@ def _fetch_updates(
             )
         )
     return updates
-
-
-def _target_alert_ids_for_ack(
-    text: str,
-    message_date_ts: int,
-    pending_by_id: dict[str, AlertRecord],
-    reply_to_message_id: int | None = None,
-) -> list[str]:
-    lowered = text.lower()
-    explicit_ids = [
-        alert_id for alert_id in pending_by_id if alert_id.lower() in lowered
-    ]
-    if explicit_ids:
-        return explicit_ids
-
-    if reply_to_message_id is not None:
-        reply_matches = [
-            alert.alert_id
-            for alert in pending_by_id.values()
-            if alert.telegram_message_id == reply_to_message_id
-        ]
-        if reply_matches:
-            return reply_matches
-
-    # Requirement: any reply in the Telegram chat counts as acknowledgement.
-    return [
-        alert.alert_id
-        for alert in pending_by_id.values()
-        if alert.sent_at_ts - ACK_TIME_GRACE_SECONDS <= message_date_ts
-    ]
 
 
 def _optional_int(value: object) -> int | None:

@@ -13,32 +13,50 @@ from infra_log_sentinel.chat.intent import (
     classify_chat_intent,
     normalize_text,
 )
-from infra_log_sentinel.chat.responder import answer_or_execute_chat
+from infra_log_sentinel.chat.conversation import ConversationSnapshot, ConversationStore
+from infra_log_sentinel.chat.responder import answer_or_execute_chat, _should_start_new_investigation
 from infra_log_sentinel.config import Settings
+from infra_log_sentinel.ingestion.local_folder import iter_log_lines
 from infra_log_sentinel.models import LogEvent, RawLogLine
 from infra_log_sentinel.notifications.telegram_format import format_chat_reply_for_telegram
 from infra_log_sentinel.notifications.telegram_chat import process_telegram_chat_updates
-from infra_log_sentinel.notifications.telegram_sender import (
-    TelegramUpdate,
-    check_ack_and_escalations,
-)
-from infra_log_sentinel.parsing.log_parser import parse_raw_line
+from infra_log_sentinel.notifications.telegram_sender import TelegramUpdate, format_alert_message
+from infra_log_sentinel.parsing.log_parser import parse_raw_line, parse_raw_lines
 from infra_log_sentinel.scheduler.runner import _run_job_safely
 from infra_log_sentinel.server import (
+    _analyze_rca_incident,
+    _analyze_current_logs_for_rca,
     _build_status,
     _delivery_status,
     _extract_question,
+    _generate_all_incident_log_scenarios,
+    _generate_log_rca_incident,
+    _generate_rca_incident,
     _prepare_runtime_storage,
-    _reset_telegram_alert_counters,
+    _send_rca_telegram_test,
     _update_runtime_control,
 )
+from infra_log_sentinel.rca import (
+    RcaIncidentStore,
+    analyze_incident,
+    format_rca_report,
+    format_rca_telegram,
+    generate_incident,
+    list_scenarios,
+)
+from infra_log_sentinel.rca.log_analyzer import analyze_log_events
+from infra_log_sentinel.simulator.log_generator import INCIDENT_SCENARIOS, generate_incident_log_lines
+from infra_log_sentinel.simulator.log_generator import generate_one_log_line
 from infra_log_sentinel.simulator.log_generator import DOMAINS
 from infra_log_sentinel.state.alert_store import AlertStore
 from infra_log_sentinel.state.runtime_control import (
+    CONTROL_INCIDENT_GENERATION,
     CONTROL_TELEGRAM_ALERTS,
     VALUE_DEMO_LOG_INTERVAL_SECONDS,
+    VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
     RuntimeControlStore,
 )
+from infra_log_sentinel.web_ui import render_chat_ui
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -53,6 +71,8 @@ def _settings(tmp_path: Path) -> Settings:
         demo_log_interval_seconds=30,
         demo_log_domain="all",
         demo_log_severity="abnormal",
+        incident_log_generator_enabled=False,
+        incident_log_interval_seconds=300,
         runtime_scheduler_enabled=False,
         runtime_scheduler_dry_run=True,
         runtime_scheduler_max_alerts=3,
@@ -353,6 +373,39 @@ def test_runtime_storage_prepares_self_contained_agentbase_folders(tmp_path: Pat
         assert (settings.log_root_path / domain).is_dir()
 
 
+def test_log_generator_supports_enterprise_source_families(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    expected_domains = {
+        "fortigate",
+        "juniper",
+        "aruba",
+        "linux",
+        "windows",
+        "vmware",
+        "checkmk",
+        "cacti",
+        "prometheus",
+        "grafana",
+        "elk",
+        "wazuh",
+        "syslog",
+    }
+
+    for domain in expected_domains:
+        generated = generate_one_log_line(settings.log_root_path, domain=domain, severity="critical")
+        assert generated.domain == domain
+        assert generated.path.parent.name == domain
+
+    events = parse_raw_lines(list(iter_log_lines(settings.log_root_path)))
+    domains = {event.domain for event in events}
+
+    assert expected_domains <= set(DOMAINS)
+    assert expected_domains <= domains
+    assert all(event.severity == "critical" for event in events)
+    assert all(event.event_type != "unknown_general_event" for event in events)
+
+
 def test_runtime_status_summarizes_recent_alerts(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _prepare_runtime_storage(settings)
@@ -376,108 +429,624 @@ def test_runtime_status_summarizes_recent_alerts(tmp_path: Path) -> None:
     assert status["top_alerts"][0]["event_type"] == "power_supply_failure"
 
 
-def test_runtime_status_includes_telegram_alert_metrics(tmp_path: Path) -> None:
+def test_runtime_status_does_not_expose_telegram_alert_counters(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _prepare_runtime_storage(settings)
-    alert_store = AlertStore(settings.state_db_path)
-    now_ts = int(datetime.now(timezone.utc).timestamp())
-    old_ts = now_ts - 8 * 24 * 60 * 60
 
-    pending_id = alert_store.upsert_pending_alert(
-        event=replace(_log_event(), line_number=1, message="pending alert"),
-        telegram_message_id=10,
-        sent_at_ts=now_ts,
-        due_at_ts=now_ts + 300,
-    )
-    acked_id = alert_store.upsert_pending_alert(
-        event=replace(_log_event(), line_number=2, message="acked alert"),
-        telegram_message_id=11,
-        sent_at_ts=now_ts,
-        due_at_ts=now_ts + 310,
-    )
-    escalated_id = alert_store.upsert_pending_alert(
-        event=replace(_log_event(), line_number=3, message="escalated alert"),
-        telegram_message_id=12,
-        sent_at_ts=now_ts,
-        due_at_ts=now_ts + 320,
-    )
-    old_id = alert_store.upsert_pending_alert(
-        event=replace(_log_event(), line_number=4, message="old acked alert"),
-        telegram_message_id=13,
-        sent_at_ts=old_ts,
-        due_at_ts=old_ts + 300,
-    )
-    alert_store.mark_acknowledged(
-        alert_id=acked_id,
-        ack_text="ACK",
-        acked_at_ts=now_ts,
-        update_id=30,
-    )
-    alert_store.mark_escalated(
-        alert_id=escalated_id,
-        escalated_at_ts=now_ts,
-        escalation_message_id=14,
-    )
-    alert_store.mark_acknowledged(
-        alert_id=old_id,
-        ack_text="ACK",
-        acked_at_ts=old_ts + 60,
-        update_id=31,
-    )
+    status = _build_status(settings)
 
-    metrics = _build_status(settings)["telegram_alert_metrics"]
-
-    assert alert_store.get_alert_status(pending_id) == "pending"
-    assert metrics["default_window"] == "today"
-    assert metrics["sent_total"] == 3
-    assert metrics["pending"] == 1
-    assert metrics["acknowledged"] == 1
-    assert metrics["escalated"] == 1
-    assert metrics["windows"]["today"] == {
-        "sent_total": 3,
-        "pending": 1,
-        "acknowledged": 1,
-        "escalated": 1,
-    }
-    assert metrics["windows"]["24h"] == metrics["windows"]["today"]
-    assert metrics["windows"]["7d"] == metrics["windows"]["today"]
-    assert metrics["windows"]["all"] == {
-        "sent_total": 4,
-        "pending": 1,
-        "acknowledged": 2,
-        "escalated": 1,
-    }
+    assert "telegram_alert_metrics" not in status
+    assert "telegram_update_pipeline" not in status
 
 
-def test_reset_telegram_alert_counters_clears_alert_records(tmp_path: Path) -> None:
+def test_rca_synthetic_generator_covers_required_scenarios() -> None:
+    scenarios = list_scenarios()
+
+    assert len(scenarios) == 10
+    assert "broadcast_loop" in scenarios
+    assert "brute_force_wazuh" in scenarios
+
+
+def test_rca_analyzer_identifies_broadcast_loop_root_cause() -> None:
+    incident = generate_incident("broadcast_loop")
+
+    analysis = analyze_incident(incident)
+
+    assert analysis["incident_id"] == incident["incident_id"]
+    assert analysis["status"] == "confirmed"
+    assert analysis["confidence"] >= 80
+    assert "Broadcast loop" in analysis["most_likely_root_cause"]
+    assert analysis["timeline"][0]["type"] == "change"
+    assert any("MAC flapping" in item for item in analysis["evidence"])
+
+
+def test_rca_store_latest_round_trip(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _prepare_runtime_storage(settings)
-    alert_store = AlertStore(settings.state_db_path)
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    store = RcaIncidentStore(settings.state_db_path)
+    incident = generate_incident("linux_disk_full")
+    analysis = analyze_incident(incident)
 
-    alert_store.upsert_pending_alert(
-        event=replace(_log_event(), line_number=1, message="pending alert"),
-        telegram_message_id=10,
-        sent_at_ts=now_ts,
-        due_at_ts=now_ts + 300,
+    store.save(incident, analysis)
+    latest = store.latest()
+
+    assert latest is not None
+    assert latest["incident"]["incident_id"] == incident["incident_id"]
+    assert latest["analysis"]["most_likely_root_cause"] == analysis["most_likely_root_cause"]
+
+
+def test_rca_chat_request_returns_structured_brief(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    answer = answer_or_execute_chat(settings, "synthetic json RCA broadcast loop", dry_run=True)
+
+    assert "AIOps RCA Investigation" in answer
+    assert "Root cause:" in answer
+    assert "RCA investigation answers" not in answer
+    assert "Broadcast loop" in answer
+    assert RcaIncidentStore(settings.state_db_path).latest() is not None
+
+
+def test_rca_report_stays_compact_without_investigation_answers(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "brute_force_wazuh")
+    events = parse_raw_lines(list(iter_log_lines(settings.log_root_path)))
+    analysis = analyze_log_events(
+        events,
+        lookback_hours=settings.report_lookback_hours,
+        alert_levels=settings.severity_alert_levels,
+        focus_text="ssh brute force from internet",
     )
 
-    result = _reset_telegram_alert_counters(settings)
+    report = format_rca_report(analysis)
+    telegram = format_rca_telegram(analysis)
+
+    assert "AIOps RCA Investigation" in report
+    assert "Root cause:" in report
+    assert "| Field | Detail |" in report
+    assert "| Root cause |" in report
+    assert "| Impact |" in report
+    assert "Event timeline:" in report
+    assert "| Time | Role | Source | Event |" in report
+    assert "Action plan:" in report
+    assert "RCA investigation answers" not in report
+    assert not any(f"**{index}." in report for index in range(1, 12))
+    assert len(report.splitlines()) <= 55
+    assert "Executive conclusion" not in report
+    assert "Recommended actions:" not in report
+    assert "<b>Root cause</b>" in telegram
+    assert "<b>RCA investigation answers</b>" not in telegram
+    assert "<b>Most Likely Root Cause</b>" not in telegram
+    assert len(telegram.splitlines()) <= 30
+
+
+def test_rca_runtime_helpers_generate_analyze_and_dry_run_telegram(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    generated = _generate_rca_incident(settings, {"scenario": "windows_service_crash"})
+    analyzed = _analyze_rca_incident(settings, {"incident": generated["incident"]})
+    telegram = _send_rca_telegram_test(settings, {"dry_run": True})
+
+    assert generated["status"] == "ok"
+    assert generated["analysis"]["confidence"] >= 70
+    assert analyzed["analysis"]["incident_id"] == generated["incident"]["incident_id"]
+    assert telegram["status"] == "dry_run"
+    assert "AIOps RCA Alert" in telegram["message"]
+    assert "<b>Most Likely Root Cause</b>" not in format_rca_telegram(generated["analysis"])
+    assert "<b>RCA investigation answers</b>" not in format_rca_telegram(generated["analysis"])
+
+
+def test_log_generator_creates_correlated_incident_logs_for_rca(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    generated = generate_incident_log_lines(settings.log_root_path, "broadcast_loop")
+    events = parse_raw_lines(list(iter_log_lines(settings.log_root_path)))
+    analysis = analyze_log_events(
+        events,
+        lookback_hours=settings.report_lookback_hours,
+        alert_levels=settings.severity_alert_levels,
+        focus_text="broadcast loop",
+    )
+
+    assert len(generated) >= 4
+    assert analysis["source"] == "log_correlation"
+    assert analysis["confidence"] >= 70
+    assert analysis["status"] in {"need_verification", "confirmed"}
+    assert analysis["correlated_events"] >= 3
+    assert "LOG-RCA" in analysis["incident_id"]
+    questions = {item["id"]: item for item in analysis["rca_questions"]}
+    assert len(questions) == 11
+    assert "Configured" in str(questions["root_candidate_event"]["answer"])
+    assert "loopback" in str(questions["symptom_events"]["answer"]) or "flapping" in str(questions["symptom_events"]["answer"])
+
+
+def test_auto_incident_generator_creates_all_incident_scenarios(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    result = _generate_all_incident_log_scenarios(settings)
+    events = parse_raw_lines(list(iter_log_lines(settings.log_root_path)))
+
+    assert result["scenario_count"] == len(INCIDENT_SCENARIOS)
+    assert set(result["scenario_counts"]) == set(INCIDENT_SCENARIOS)
+    assert result["generated_count"] >= len(INCIDENT_SCENARIOS) * 3
+    assert len(events) == result["generated_count"]
+    assert any(event.domain == "fortigate" for event in events)
+    assert any(event.domain == "windows" for event in events)
+    assert any(event.domain == "network" for event in events)
+
+
+def test_log_rca_runtime_helper_generates_logs_then_analyzes(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    result = _generate_log_rca_incident(settings, {"scenario": "windows_service_crash"})
+    current = _analyze_current_logs_for_rca(settings, {})
+    status = _build_status(settings)
 
     assert result["status"] == "ok"
-    assert result["deleted_count"] == 1
-    assert result["telegram_alert_metrics"]["windows"]["all"] == {
-        "sent_total": 0,
-        "pending": 0,
-        "acknowledged": 0,
-        "escalated": 0,
-    }
-    assert alert_store.status_counts() == {
-        "sent_total": 0,
-        "pending": 0,
-        "acknowledged": 0,
-        "escalated": 0,
-    }
+    assert result["generated_count"] >= 3
+    assert result["analysis"]["source"] == "log_correlation"
+    assert current["analysis"]["source"] == result["analysis"]["source"]
+    assert current["analysis"]["anchor_event"]["source"] == result["analysis"]["anchor_event"]["source"]
+    assert status["rca"]["log_analysis"]["anchor_event"]["source"] == result["analysis"]["anchor_event"]["source"]
+    assert len(status["rca"]["log_analysis"]["rca_questions"]) == 11
+
+
+def test_rca_chat_can_generate_incident_logs_before_analysis(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    noise_file = settings.log_root_path / "network" / "dynamic-network.log"
+    noise_file.write_text(
+        (
+            "2026-06-14T10:00:00+07:00 core-sw-noise.example.local "
+            "%PLATFORM-2-PS_FAIL: Power supply 2 failed or removed\n"
+        ),
+        encoding="utf-8",
+    )
+
+    answer = answer_or_execute_chat(
+        settings,
+        "sinh log su co broadcast loop roi phan tich RCA",
+        dry_run=True,
+    )
+
+    assert "AIOps RCA Investigation" in answer
+    assert "Scenario: `broadcast_loop`" in answer
+    assert "loopback error" in answer or "BGP" in answer
+    assert "power_supply_failure" not in answer
+    assert "Power supply 2 failed" not in answer
+    assert "Mode: RCA from current parsed logs." not in answer
+
+
+def test_log_rca_generator_api_analyzes_only_generated_incident_burst(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    noise_file = settings.log_root_path / "network" / "dynamic-network.log"
+    noise_file.write_text(
+        (
+            "2026-06-14T10:00:00+07:00 core-sw-noise.example.local "
+            "%PLATFORM-2-PS_FAIL: Power supply 2 failed or removed\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = _generate_log_rca_incident(settings, {"scenario": "broadcast_loop"})
+    analysis = result["analysis"]
+    event_types = {item["event"].split(":", 1)[0] for item in analysis["timeline"]}
+
+    assert result["status"] == "ok"
+    assert analysis["scope_label"] == "generated broadcast_loop incident burst"
+    assert analysis["correlated_events"] >= 3
+    assert "power_supply_failure" not in event_types
+    assert any("loopback" in item["event"] or "mac_flapping" in item["event"] for item in analysis["timeline"])
+
+
+def test_log_rca_generator_api_keeps_fortigate_scenario_isolated(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    noise_file = settings.log_root_path / "network" / "dynamic-network.log"
+    noise_file.write_text(
+        (
+            "2026-06-14T10:00:00+07:00 core-rtr01.example.local "
+            "%BGP-5-ADJCHANGE: neighbor 10.255.0.2 Down BGP Notification sent\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = _generate_log_rca_incident(settings, {"scenario": "fortigate_session_spike"})
+    analysis = result["analysis"]
+    timeline_text = " ".join(item["event"] for item in analysis["timeline"])
+    evidence_text = " ".join(str(item) for item in analysis["evidence"])
+
+    assert result["status"] == "ok"
+    assert result["scenario"] == "fortigate_session_spike"
+    assert analysis["scope_label"] == "generated fortigate_session_spike incident burst"
+    assert "fortigate" in timeline_text.lower() or "fortigate" in evidence_text.lower()
+    assert "Session table usage high" in timeline_text or "Session table usage high" in evidence_text
+    assert "routing_neighbor_down" not in timeline_text
+    assert "routing_neighbor_down" not in evidence_text
+
+
+def test_rca_chat_diagnoses_when_user_reports_impact_without_rca_keyword(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "windows_service_crash")
+
+    answer = answer_or_execute_chat(
+        settings,
+        "user bao service SQLAgent down trong 1 gio qua, impact database job khong chay",
+        dry_run=True,
+    )
+
+    assert "AIOps RCA Investigation" in answer
+    assert "Root cause:" in answer
+    assert "Event timeline:" in answer
+    assert "RCA investigation answers" not in answer
+    assert "Scope: `last 1h`" in answer
+    assert "SQLAgent" in answer or "service_failure" in answer
+    assert "deployed configuration update" in answer
+    latest = RcaIncidentStore(settings.state_db_path).latest()
+    assert latest is not None
+    assert latest["analysis"]["focus_terms"]
+
+
+def test_rca_chat_applies_llm_adjudication_when_available(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "windows_service_crash")
+    calls = {}
+
+    def fake_adjudicator(settings, question, analysis):
+        calls["question"] = question
+        calls["incident_id"] = analysis["incident_id"]
+        return {
+            "verdict": "confirmed",
+            "root_cause": "SQLAgent plugin deployment change is the most likely root cause before the service crash.",
+            "confidence": 92,
+            "rationale": ["The deployment event appears before the application crash and SQLAgent termination."],
+            "missing_data": ["Windows service dependency status around the incident window."],
+            "recommended_actions": ["Verify the plugin version and prepare a rollback if the crash repeats."],
+        }
+
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.adjudicate_rca_with_llm", fake_adjudicator)
+
+    answer = answer_or_execute_chat(
+        settings,
+        "user bao service SQLAgent down trong 1 gio qua, impact database job khong chay",
+        dry_run=True,
+    )
+    latest = RcaIncidentStore(settings.state_db_path).latest()
+
+    assert calls["incident_id"].startswith("LOG-RCA")
+    assert "LLM review: `confirmed`" in answer
+    assert "SQLAgent plugin deployment change" in answer
+    assert latest is not None
+    assert latest["analysis"]["llm_review"]["applied"] is True
+
+
+def test_rca_chat_uses_llm_guidance_when_log_evidence_is_insufficient(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    called = {}
+
+    def fake_guidance(**kwargs):
+        called["analysis"] = kwargs["analysis"]
+        return "## RCA chưa đủ dữ liệu\n- Kết luận: MiniMax chỉ gợi ý bước điều tra tiếp theo."
+
+    monkeypatch.setattr(
+        "infra_log_sentinel.chat.responder.suggest_rca_next_steps_with_llm",
+        fake_guidance,
+    )
+
+    answer = answer_or_execute_chat(
+        settings,
+        "user bao app khong truy cap duoc trong 1 gio qua, impact user khong login duoc",
+        dry_run=True,
+    )
+
+    assert "RCA chưa đủ dữ liệu" in answer
+    assert "MiniMax chỉ gợi ý" in answer
+    assert "LLM guidance:" in answer
+    assert called["analysis"]["status"] == "insufficient_data"
+
+
+def test_rca_panel_attaches_llm_guidance_when_focus_has_no_evidence(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "vmware_datastore_full")
+    called = {}
+
+    def fake_guidance(**kwargs):
+        called["analysis"] = kwargs["analysis"]
+        return (
+            "## LLM guidance: RCA chưa đủ dữ liệu\n"
+            "- Kết luận: chưa thể xác nhận root cause cho impact mới lạ này.\n"
+            "- Bước tiếp theo an toàn: thu thêm log đúng component bị impact."
+        )
+
+    monkeypatch.setattr("infra_log_sentinel.server.suggest_rca_next_steps_with_llm", fake_guidance)
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "unknown payment gateway brownout",
+        },
+    )
+    analysis = result["analysis"]
+    report = format_rca_report(analysis)
+
+    assert result["status"] == "ok"
+    assert analysis["status"] == "insufficient_data"
+    assert "LLM guidance" in analysis["llm_guidance"]
+    assert "impact mới lạ" in analysis["llm_guidance"]
+    assert "LLM guidance:" in report
+    assert called["analysis"]["incident_id"] == "LOG-RCA-FOCUS-NOT-FOUND"
+
+
+def test_rca_panel_analysis_applies_llm_adjudication_when_available(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "mac_flapping")
+
+    monkeypatch.setattr(
+        "infra_log_sentinel.server.adjudicate_rca_with_llm",
+        lambda settings, question, analysis: {
+            "verdict": "needs_verification",
+            "root_cause": "Redundant uplink change is the leading candidate for MAC flapping.",
+            "confidence": 82,
+            "rationale": ["The config event and MAC flapping share the same switch and interface context."],
+            "missing_data": ["STP topology-change counter on dist-sw02."],
+            "recommended_actions": ["Check STP/LACP state on Gi2/0/21 before remediation."],
+        },
+    )
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "mac flaping",
+        },
+    )
+    analysis = result["analysis"]
+
+    assert result["status"] == "ok"
+    assert analysis["llm_review"]["verdict"] == "needs_verification"
+    assert "Redundant uplink change" in analysis["most_likely_root_cause"]
+    assert any("LLM review" in item for item in analysis["evidence"])
+
+
+def test_chat_context_can_be_reset_explicitly(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    channel = "test-new-chat"
+
+    first = answer_or_execute_chat(
+        settings,
+        "sinh log su co broadcast loop roi phan tich RCA",
+        dry_run=True,
+        channel=channel,
+    )
+    reset = answer_or_execute_chat(settings, "new chat", dry_run=True, channel=channel)
+    snapshot = ConversationStore(settings.state_db_path).get(channel)
+
+    assert "AIOps RCA Investigation" in first
+    assert "ngu canh hoi thoai moi" in normalize_text(reset)
+    assert snapshot.last_action == "context_reset"
+    assert snapshot.last_user_message == "new chat"
+
+
+def test_chat_context_starts_new_investigation_when_topic_changes() -> None:
+    snapshot = ConversationSnapshot(
+        channel="web",
+        last_user_message="phan tich RCA service SQLAgent down tren windows database",
+        last_agent_message="old answer",
+        last_intent="rca",
+        last_action="rca",
+        last_artifact_path="",
+        updated_at_ts=1,
+    )
+
+    assert _should_start_new_investigation(
+        "phan tich RCA wazuh brute force ssh tu internet",
+        snapshot,
+    )
+    assert not _should_start_new_investigation(
+        "can kiem tra them du lieu gi cho RCA nay",
+        snapshot,
+    )
+
+
+def test_web_ui_moves_rca_workspace_to_right_rail_tabs() -> None:
+    html = render_chat_ui("Infra Log Sentinel")
+    conversation_start = html.index('<section class="conversation"')
+    conversation_end = html.index("</section>", conversation_start)
+    conversation_html = html[conversation_start:conversation_end]
+
+    assert "rca-workspace" not in conversation_html
+    assert 'data-rail-tab="sentinel"' in html
+    assert 'data-rail-tab="rca"' in html
+    assert "RCA lens" not in html
+    assert html.count('id="rca-workspace-result"') == 1
+    assert "rcaWorkspaceHasRun" in html
+    assert "rcaWorkspaceAnalysis" in html
+    assert "renderRcaWorkspaceAnalysis(state.rcaWorkspaceAnalysis)" in html
+    assert 'id="rca-clear"' in html
+    assert "clearRcaWorkspace" in html
+    assert 'id="new-chat"' in html
+    assert "startNewChatSession" in html
+    assert "let conversationId = getConversationId();" in html
+    assert 'data-prompt="user bao service SQLAgent down' not in html
+    assert '<input id="rca-lookback" type="number" min="0.25" max="168" step="0.25">' in html
+    assert '<input id="rca-start" type="datetime-local">' in html
+    assert '<input id="rca-end" type="datetime-local">' in html
+    assert 'id="rca-scenario"' not in html
+    assert 'id="rca-generate"' not in html
+    assert 'data-runtime-control="incident_generation"' in html
+    assert 'id="control-incident-interval-input"' in html
+    assert "All RCA incident scenarios" in html
+
+
+def test_log_rca_api_accepts_focus_and_lookback(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "brute_force_wazuh")
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "ssh admin login failures from internet",
+        },
+    )
+
+    assert result["status"] == "ok"
+    assert result["analysis"]["source"] == "log_correlation"
+    assert result["analysis"]["focus_terms"]
+    assert result["analysis"]["confidence"] >= 70
+
+
+def test_log_rca_current_logs_prioritizes_focus_over_unrelated_critical_events(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "routing_issue")
+    generate_incident_log_lines(settings.log_root_path, "fortigate_session_spike")
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "fortigate session spike",
+        },
+    )
+    analysis = result["analysis"]
+    timeline_text = " ".join(item["event"] for item in analysis["timeline"])
+    evidence_text = " ".join(str(item) for item in analysis["evidence"])
+
+    assert result["status"] == "ok"
+    assert analysis["anchor_event"]["domain"] == "fortigate"
+    assert "fortigate" in " ".join(item["source"] for item in analysis["timeline"]).lower()
+    assert "Session table usage high" in timeline_text or "Session table usage high" in evidence_text
+    assert "routing_neighbor_down" not in analysis["most_likely_root_cause"]
+    assert "routing_neighbor_down" not in timeline_text
+
+
+def test_log_rca_focus_correlation_blocks_same_domain_false_root_cause(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "routing_issue")
+    generate_incident_log_lines(settings.log_root_path, "mac_flapping")
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "mac flaping",
+        },
+    )
+    analysis = result["analysis"]
+    timeline_text = " ".join(item["event"] for item in analysis["timeline"])
+    evidence_text = " ".join(str(item) for item in analysis["evidence"])
+    root_text = analysis["most_likely_root_cause"]
+
+    assert result["status"] == "ok"
+    assert analysis["anchor_event"]["event_type"] == "mac_flapping"
+    assert "mac_flapping" in timeline_text or "mac_flapping" in root_text
+    assert "dist-sw02.example.local" in timeline_text or "dist-sw02.example.local" in root_text
+    assert "routing_neighbor_down" not in root_text
+    assert "routing_neighbor_down" not in timeline_text
+    assert "Configured BGP export policy" not in root_text
+    assert "Configured BGP export policy" not in evidence_text
+
+
+def test_log_rca_focus_miss_does_not_fallback_to_unrelated_incident(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "vmware_datastore_full")
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "lookback_hours": 1,
+            "impact": "mac flaping",
+        },
+    )
+    analysis = result["analysis"]
+
+    assert result["status"] == "ok"
+    assert analysis["status"] == "insufficient_data"
+    assert analysis["incident_id"] == "LOG-RCA-FOCUS-NOT-FOUND"
+    assert analysis["analyzed_events"] > 0
+    assert analysis["correlated_events"] == 0
+    assert "vm_unexpected_poweroff" not in analysis["most_likely_root_cause"]
+
+
+def test_log_rca_timeline_excludes_same_domain_noise_without_focus(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    generate_incident_log_lines(settings.log_root_path, "dns_timeout")
+    log_file = settings.log_root_path / "linux" / "dynamic-linux.log"
+    base = datetime.now(timezone.utc).astimezone().replace(microsecond=0)
+    stamp = base.strftime("%b %d %H:%M:%S")
+    lines = [
+        f"{stamp} linux-web01.example.local sshd[1842]: Failed password for invalid user admin from 203.0.113.79 port 51520 ssh2",
+        f"{stamp} linux-web02.example.local kernel: TCP: request_sock_TCP: Possible SYN flooding on port 443. Sending cookies.",
+        f"{stamp} syslog01.example.local app-worker[2410]: job-runner.service failed with result exit-code",
+    ]
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+
+    result = _analyze_current_logs_for_rca(settings, {"lookback_hours": 1, "impact": "dns timeout"})
+    analysis = result["analysis"]
+    timeline_text = " ".join(item["event"] for item in analysis["timeline"])
+
+    assert result["status"] == "ok"
+    assert analysis["anchor_event"]["event_type"] in {"dns_timeout", "application_timeout"}
+    assert "DNS query timeout" in timeline_text
+    assert "named.service zone configuration update" in timeline_text
+    assert "authentication_failure" not in timeline_text
+    assert "possible_syn_flood" not in timeline_text
+    assert "job-runner.service failed" not in timeline_text
+
+
+def test_log_rca_api_accepts_absolute_time_range(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    log_file = settings.log_root_path / "network" / "dynamic-network.log"
+    log_file.write_text(
+        "\n".join(
+            [
+                "2026-06-14T10:00:00+07:00 old-sw.example.local %PLATFORM-2-PS_FAIL: Power supply 2 failed or removed",
+                "2026-06-14T10:10:00+07:00 core-sw01.example.local %SYS-5-CONFIG_I: Configured temporary uplink Gi1/0/48",
+                "2026-06-14T10:11:00+07:00 access-sw07.example.local %PM-4-ERR_DISABLE: loopback error detected on Gi1/0/48, putting Gi1/0/48 in err-disable state",
+                "2026-06-14T11:00:00+07:00 late-sw.example.local %PLATFORM-2-PS_FAIL: Power supply 1 failed or removed",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _analyze_current_logs_for_rca(
+        settings,
+        {
+            "start_time": "2026-06-14T10:05",
+            "end_time": "2026-06-14T10:20",
+            "impact": "loop on access port",
+        },
+    )
+    analysis = result["analysis"]
+    timeline_text = " ".join(item["event"] for item in analysis["timeline"])
+
+    assert result["status"] == "ok"
+    assert analysis["analyzed_events"] == 2
+    assert "from 10:05:00 14/06/2026 to 10:20:00 14/06/2026" in analysis["scope_label"]
+    assert "loopback" in timeline_text
+    assert "Power supply" not in timeline_text
 
 
 def test_runtime_status_exposes_telegram_delivery_state(tmp_path: Path) -> None:
@@ -563,11 +1132,11 @@ def test_scheduler_job_errors_are_logged_without_raising(monkeypatch) -> None:
     )
 
     _run_job_safely(
-        "ACK/escalation job",
+        "Alert scan job",
         lambda: (_ for _ in ()).throw(RuntimeError("telegram 409")),
     )
 
-    assert messages == ["ACK/escalation job failed: RuntimeError: telegram 409"]
+    assert messages == ["Alert scan job failed: RuntimeError: telegram 409"]
 
 
 def test_runtime_control_api_toggles_alerts_and_saves_interval(tmp_path: Path) -> None:
@@ -601,6 +1170,22 @@ def test_runtime_control_api_toggles_alerts_and_saves_interval(tmp_path: Path) -
     assert interval_result["message"] == "Generator interval saved: 17s."
     assert RuntimeControlStore(settings.state_db_path).get_value(VALUE_DEMO_LOG_INTERVAL_SECONDS) == "17"
 
+    incident_off = _update_runtime_control(
+        settings,
+        {"control": CONTROL_INCIDENT_GENERATION, "enabled": False},
+    )
+    incident_pause = incident_off["status"]["runtime_controls"]["pauses"][CONTROL_INCIDENT_GENERATION]
+    assert incident_pause["paused"] is True
+    assert incident_pause["manual_off"] is True
+
+    incident_interval = _update_runtime_control(
+        settings,
+        {"setting": VALUE_INCIDENT_LOG_INTERVAL_SECONDS, "seconds": 240},
+    )
+
+    assert incident_interval["message"] == "Incident generator interval saved: 240s."
+    assert RuntimeControlStore(settings.state_db_path).get_value(VALUE_INCIDENT_LOG_INTERVAL_SECONDS) == "240"
+
 
 def test_runtime_extracts_last_chat_message() -> None:
     question = _extract_question(
@@ -615,7 +1200,7 @@ def test_runtime_extracts_last_chat_message() -> None:
     assert question == "tom tat log hom nay"
 
 
-def test_telegram_chat_ack_only_marks_pending(tmp_path: Path, monkeypatch) -> None:
+def test_telegram_chat_ack_is_handled_as_regular_message(tmp_path: Path, monkeypatch) -> None:
     settings = _settings(tmp_path)
     alert_store = AlertStore(settings.state_db_path)
     alert_id = alert_store.upsert_pending_alert(
@@ -641,14 +1226,13 @@ def test_telegram_chat_ack_only_marks_pending(tmp_path: Path, monkeypatch) -> No
     )
 
     assert result.processed_count == 1
-    assert result.acked_count == 1
-    assert result.answered_count == 0
-    assert alert_store.get_alert_status(alert_id) == "acknowledged"
+    assert result.answered_count == 1
+    assert alert_store.get_alert_status(alert_id) == "pending"
     assert alert_store.get_chat_update_id() == 20
-    assert alert_store.get_ack_update_id() is None
-    assert responder_calls == []
+    assert responder_calls == ["ACK"]
     assert len(sent_messages) == 1
-    assert "INFRA-LOG-SENTINEL ACK" in sent_messages[0][0]
+    assert "INFRA-LOG-SENTINEL" in sent_messages[0][0]
+    assert "answer" in sent_messages[0][0]
     assert sent_messages[0][1] == "HTML"
 
 
@@ -674,57 +1258,20 @@ def test_telegram_chat_question_sends_responder_answer_and_advances_cursor(
     )
 
     assert result.processed_count == 1
-    assert result.acked_count == 0
     assert result.answered_count == 1
     assert alert_store.get_chat_update_id() == 21
-    assert alert_store.get_ack_update_id() is None
     assert len(sent_messages) == 1
     assert "INFRA-LOG-SENTINEL" in sent_messages[0][0]
     assert "answer for: tom tat log hom nay" in sent_messages[0][0]
     assert sent_messages[0][1] == "HTML"
 
 
-def test_ack_job_uses_separate_cursor_from_chat_bridge(tmp_path: Path, monkeypatch) -> None:
-    settings = replace(
-        _settings(tmp_path),
-        telegram_bot_token="123456:realish-token-for-test",
-        telegram_chat_id="1234567890",
-    )
-    alert_store = AlertStore(settings.state_db_path)
-    alert_id = alert_store.upsert_pending_alert(
-        event=_log_event(),
-        telegram_message_id=10,
-        sent_at_ts=1000,
-        due_at_ts=9999999999,
-    )
-    alert_store.set_chat_update_id(30)
-    offsets = []
+def test_telegram_alert_message_is_one_way_without_ack_prompt() -> None:
+    message = format_alert_message(_log_event(), index=1, total=1, alert_id="ALS-TEST")
 
-    monkeypatch.setattr(
-        "infra_log_sentinel.notifications.telegram_sender._fetch_updates",
-        lambda token, chat_id, offset, timeout_seconds=0: offsets.append(offset)
-        or [
-            TelegramUpdate(
-                update_id=20,
-                message_date_ts=200,
-                text="ACK",
-                reply_to_message_id=10,
-            )
-        ],
-    )
-    monkeypatch.setattr(
-        "infra_log_sentinel.notifications.telegram_sender._send_message",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should not escalate")),
-    )
-
-    result = check_ack_and_escalations(settings=settings, alert_store=alert_store)
-
-    assert offsets == [None]
-    assert result.acked_count == 1
-    assert result.escalated_count == 0
-    assert alert_store.get_alert_status(alert_id) == "acknowledged"
-    assert alert_store.get_chat_update_id() == 30
-    assert alert_store.get_ack_update_id() == 20
+    assert "ALS-TEST" in message
+    assert "Reply <b>ACK</b>" not in message
+    assert "escalation timeout" not in message
 
 
 def test_telegram_summary_formatter_adds_professional_sections() -> None:

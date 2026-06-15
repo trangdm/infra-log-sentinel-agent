@@ -10,9 +10,9 @@ Infrastructure Log Sentinel Agent is a Claw-a-thon 2026 agent for analyzing raw 
 - Classify severity: info, warning, error, critical.
 - Analyze summary, probable cause, impact, and recommended action.
 - Send realtime Telegram alerts for new warning/error/critical log lines.
-- Send an `[ESCALATE]` Telegram message if no ACK is received within 5 minutes.
 - Generate a daily 24-hour PDF report at 09:00 and send it through Gmail.
 - Provide a web chat console for log questions, report actions, runtime controls, and runbook commands.
+- Perform AIOps RCA on synthetic incidents with timeline, evidence, hypotheses, confidence scoring, safe actions, and Telegram-ready RCA output.
 
 ## Hosted demo
 
@@ -24,15 +24,69 @@ https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatfo
 
 The hosted demo runs in `runtime_folder` mode. It creates `/app/data/logs`, bootstraps sample infrastructure logs, and can generate new synthetic abnormal logs for realtime alert testing. The web console is optimized for desktop demo: chat stays fixed at the bottom, the priority queue scrolls internally, and the right-side runtime panels remain visible in one viewport.
 
+## AIOps RCA MVP
+
+The agent includes a deterministic RCA workflow that can analyze the current parsed logs or generate a correlated incident log burst first:
+
+```text
+Log generator incident burst -> Parser -> Timeline -> Correlation -> Root cause hypothesis -> Evidence -> Actions -> Telegram-ready RCA brief
+```
+
+Supported log-generator RCA scenarios:
+
+- `broadcast_loop`
+- `mac_flapping`
+- `fortigate_session_spike`
+- `dns_timeout`
+- `linux_disk_full`
+- `windows_service_crash`
+- `vmware_datastore_full`
+- `interface_flapping`
+- `routing_issue`
+- `brute_force_wazuh`
+
+Example chat prompts:
+
+```text
+sinh log su co broadcast loop roi phan tich RCA
+phan tich RCA tu log hien tai
+gui RCA Telegram fortigate
+synthetic json RCA broadcast loop
+```
+
+RCA API endpoints:
+
+```text
+POST /rca/logs/generate
+POST /rca/logs/analyze
+POST /demo/incidents/generate
+POST /incidents/analyze
+GET /incidents/latest
+POST /telegram/test
+```
+
+Example:
+
+```powershell
+Invoke-WebRequest `
+  -Uri "http://127.0.0.1:8080/rca/logs/generate" `
+  -Method Post `
+  -ContentType "application/json; charset=utf-8" `
+  -Body '{"scenario":"broadcast_loop"}' `
+  -UseBasicParsing
+```
+
 ## Final submission snapshot
 
 - Project: Infrastructure Log Sentinel Agent.
 - Repository: `https://github.com/trangdm/infra-log-sentinel-agent`.
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`.
 - Hosted endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`.
-- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17`.
+- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`.
+- Submitted runtime image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`.
+- Endpoint version: `33`.
 - Runtime mode: `runtime_folder`, self-contained synthetic infrastructure log demo.
-- Verification on 2026-06-13: `/health` returned `ok`, `/status` returned `telegram_alert_metrics.windows`, runtime controls were available, and the runtime scheduler worker was `running`. Telegram alert delivery can be toggled live from the Runtime Controls panel before the realtime alert demo.
+- Verification on 2026-06-15: runtime `ACTIVE`, endpoint `ACTIVE`, replica count `1`, `/health` returned `ok`, `/status` returned `ok` in `runtime_folder` mode, hosted RCA insufficient-data smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, and the local regression suite passed with `51 passed`.
 
 For the copy-ready GreenNode submission packet, see `docs/submission.md`.
 
@@ -215,7 +269,7 @@ Process one Telegram chat cycle for testing:
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --telegram-chat-once --dry-run
 ```
 
-When the bridge is running, send messages like `tom tat log hom nay`, `co critical network nao khong?`, or `command xu ly vmware warning` to the configured Telegram chat. A plain `ACK` still acknowledges pending alerts.
+When the bridge is running, send messages like `tom tat log hom nay`, `co critical network nao khong?`, or `command xu ly vmware warning` to the configured Telegram chat.
 
 Telegram chat replies use the same HTML visual language as realtime alerts: severity/domain icons, bold labels, compact code values, priority findings, and suggested next steps.
 
@@ -243,18 +297,6 @@ Send all warning/error/critical Telegram alerts from the folder for manual testi
 
 ```powershell
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --telegram-alerts
-```
-
-Check Telegram replies and escalate expired pending alerts:
-
-```powershell
-C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --check-acks
-```
-
-Force one escalation for local demo only:
-
-```powershell
-C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --check-acks --force-escalate --max-escalations 1
 ```
 
 Run one scheduler cycle safely without sending messages:
@@ -361,7 +403,7 @@ Notes:
 - For the self-contained GreenNode demo, the Docker image uses `LOG_SOURCE_MODE=runtime_folder`, creates `/app/data/logs`, bootstraps synthetic logs, and appends a new abnormal log every 30 seconds.
 - Scheduler delivery is disabled by default in Docker. Enable `RUNTIME_SCHEDULER_ENABLED=true` and `RUNTIME_SCHEDULER_DRY_RUN=false` only after Gmail and Telegram env vars are ready.
 - Runtime control chat commands can pause Telegram alerts, scheduled Gmail reports, or auto log generation until a relative duration or a clock time. Examples: `tam dung alert va report trong 30 phut`, `tam ngung sinh log den 17:30`, `doi interval sinh log 120 giay`.
-- To enable Telegram chat in the hosted runtime, set `TELEGRAM_CHAT_ENABLED=true` after `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured. The runtime uses polling and the same `telegram_last_update_id` cursor as ACK checks, so run `--init-telegram-chat` locally or start from a fresh bot/chat queue before enabling it for a live demo.
+- To enable Telegram chat in the hosted runtime, set `TELEGRAM_CHAT_ENABLED=true` after `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured. The runtime uses polling with its Telegram chat cursor, so run `--init-telegram-chat` locally or start from a fresh bot/chat queue before enabling it for a live demo.
 
 ## Documentation
 

@@ -90,14 +90,13 @@ Completed:
 
 - Added runtime control state in SQLite.
 - Runtime control uses `APP_TIMEZONE` for pause timestamps; Docker defaults to `Asia/Ho_Chi_Minh`.
-- Chat can pause/resume Telegram alerts and escalation.
+- Chat can pause/resume Telegram alerts.
 - Chat can pause/resume scheduled Gmail reports.
 - Chat can pause/resume auto log generation.
 - Chat can update auto log generation interval while the runtime is running.
 - Scheduler respects pause state:
   - When Telegram alerts are paused, realtime alert scans consume the cursor without sending Telegram messages, avoiding alert backlog after resume.
   - When Gmail reports are paused, daily report email is skipped.
-  - ACK/escalation checks are skipped while Telegram alerts are paused.
 - Chat Gmail report action respects Gmail report pause state.
 - `/status` includes `runtime_controls`.
 
@@ -105,7 +104,7 @@ Verified:
 
 - CLI chat control status works.
 - CLI chat pause alert/report works.
-- Scheduler dry-run skips report, alert, and escalation while paused.
+- Scheduler dry-run skips report and alert delivery while paused.
 - CLI chat Gmail action is blocked while report pause is active.
 - Runtime API can pause auto log generation and resume it without restart.
 - Runtime API can update generator interval without restart.
@@ -132,7 +131,12 @@ Completed:
 - Deployed GreenNode AgentBase runtime:
   - Runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
   - Endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
-  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17`
+  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`
+  - Image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`
+  - Endpoint version: `33`
+  - Runtime status: `ACTIVE`
+  - Endpoint status: `ACTIVE`
+  - Current replicas: `1`
 - Added Telegram chat bridge for operator questions through Telegram.
 - Hardened agent chat logic:
   - Intent routing separates operational questions, report requests, runtime controls, command explanations, and assistant-feedback corrections.
@@ -143,21 +147,26 @@ Completed:
   - Priority queue.
   - Runtime controls.
   - Telegram alert delivery state.
-  - Telegram counter panel with `Today`, `24h`, `7d`, `All`, and reset action.
+  - RCA workspace for impact/window/scenario-driven diagnosis.
 - Added Telegram delivery reliability:
   - Alert scan job exception isolation.
-  - Separate Telegram chat and ACK cursors.
-  - Reply-to-message ACK matching.
-  - ACK/escalation checks continue while the scheduler worker stays alive.
+- Telegram alerts are one-way notifications; ACK/escalation and alert counter cards are retired.
 
-Verified after v17 deployment:
+Verified after v35 deployment on 2026-06-15:
 
 - `GET /health` returned `ok`.
-- `GET /status` returned `telegram_alert_metrics.windows`.
+- `GET /status` returned `ok` in `runtime_folder` mode.
+- Hosted RCA insufficient-data smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, and `llm_guidance=true`.
 - Telegram alert delivery is controlled by the Runtime Controls panel and can be toggled live before a realtime alert demo.
-- Runtime scheduler worker state was `running`.
-- Hosted UI contained the Telegram counter filter tabs and reset button.
-- Runtime container regression suite passed: `25 passed`.
+- Hosted UI exposes separate right-panel `Log Sentinel` and `RCA` tabs.
+- RCA workspace no longer occupies the chat conversation space.
+- Runtime UI exposes `New chat` context reset and RCA workspace `Clear`.
+- Runtime RCA/chat smoke returned a compact RCA brief with 11 investigation answers.
+- Runtime UI exposes an `Incident generator` runtime control with editable all-scenario incident interval.
+- RCA workspace now analyzes current logs only; incident generation is controlled from Runtime Controls.
+- RCA current-log analysis now prioritizes the user-provided symptom/focus before unrelated critical events.
+- RCA workspace keeps the user's latest focused analysis in browser state so `/status` refreshes cannot overwrite it.
+- Runtime container regression suite passed locally: `51 passed`.
 
 ## Runtime contract
 
@@ -223,7 +232,7 @@ docker run --rm -p 8080:8080 --env-file .env `
   infra-log-sentinel-agent:test
 ```
 
-The bridge uses polling and the same `telegram_last_update_id` cursor as ACK checks, so initialize the cursor before a live demo if the bot has old queued messages.
+The bridge uses polling with its Telegram chat cursor, so initialize the cursor before a live demo if the bot has old queued messages.
 
 Enable autonomous scheduler delivery only when Gmail and Telegram env vars are ready:
 

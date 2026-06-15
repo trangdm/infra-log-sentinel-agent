@@ -8,7 +8,22 @@ from infra_log_sentinel.state.log_cursor import LogCursorStore
 
 
 SUPPORTED_EXTENSIONS = {".log", ".txt", ".csv"}
-KNOWN_DOMAINS = {"network", "windows", "linux", "vmware"}
+KNOWN_DOMAINS = {
+    "network",
+    "fortigate",
+    "juniper",
+    "aruba",
+    "linux",
+    "windows",
+    "vmware",
+    "checkmk",
+    "cacti",
+    "prometheus",
+    "grafana",
+    "elk",
+    "wazuh",
+    "syslog",
+}
 
 
 def iter_log_lines(log_root_path: Path) -> Iterable[RawLogLine]:

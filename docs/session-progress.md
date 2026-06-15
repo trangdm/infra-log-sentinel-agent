@@ -1,6 +1,6 @@
 # Session Progress
 
-Last updated: 2026-06-13
+Last updated: 2026-06-15
 
 ## Project
 
@@ -13,8 +13,10 @@ Use case:
 - Parse, classify severity, analyze probable cause, impact, and recommended action.
 - Generate daily PDF summary report at 09:00.
 - Send report by personal Gmail.
-- Send Telegram alert for warning/error/critical events.
-- Escalate with `[ESCALATE]` tag if no ACK is received within 5 minutes.
+- Send one-way Telegram alert notifications for warning/error/critical events.
+- Provide an RCA workspace for impact/window/scenario-driven diagnosis.
+
+Current note: ACK/escalation and Telegram alert counters were retired in v20. v21 moved RCA into a dedicated right-panel tab and added MiniMax next-step guidance when log evidence is insufficient. v22 expands the log generator/parser to Fortigate, Juniper, Aruba, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style sources. v23 compacts RCA chat answers, adds explicit New chat context reset, and adds RCA workspace Clear. v24 adds an all-scenario incident log generator runtime control and removes scenario generation from the RCA panel. v25 makes RCA current-log search focus-aware so user symptoms such as Fortigate session spike are prioritized over unrelated critical events. v26 keeps the RCA workspace's latest focused result in browser state so background status refreshes cannot overwrite it. v35 was redeployed after GreenNode fixed the overloaded runtime infrastructure; the main runtime and endpoint are ACTIVE. Older entries below are historical progress notes, not current product scope.
 
 ## Workspace
 
@@ -71,7 +73,12 @@ Final hosted runtime:
 ```text
 Runtime ID: runtime-a864917b-1a16-4083-a64c-82f4e79f6602
 Endpoint: https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
-Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17
+Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35
+Image digest: sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b
+Endpoint version: 33
+Runtime status: ACTIVE
+Endpoint status: ACTIVE
+Current replicas: 1
 Submission packet: docs/submission.md
 ```
 
@@ -178,19 +185,13 @@ C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --telegram-alerts --max-alerts 3
 ```
 
-4. Optional ACK/escalation retest:
+4. Optional RCA workspace/API retest:
 
 ```powershell
-C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --check-acks
+C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --chat "user bao service SQLAgent down trong 1 gio qua, impact database job khong chay"
 ```
 
-5. Optional local demo escalation:
-
-```powershell
-C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --check-acks --force-escalate --max-escalations 1
-```
-
-6. Optional scheduler dry-run:
+5. Optional scheduler dry-run:
 
 ```powershell
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --scheduler-once --dry-run --max-alerts 3
@@ -247,4 +248,12 @@ C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --chat "export alert critical network ra file csv"
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --chat "gửi báo cáo hôm nay qua Gmail" --dry-run
 C:\Users\LAP14917-local\Documents\Codex\.venvs\infra-log-sentinel-agent\Scripts\python.exe -m infra_log_sentinel.main --chat "kiểm tra có log mới bất thường không"
+```
+
+## Runtime handoff before Greennode support check - 2026-06-14
+
+Saved current deployment state, runtime IDs, endpoint IDs, image tags, suspected AgentBase provisioning issue, and resume checklist in:
+
+```text
+docs/greennode-runtime-handoff.md
 ```

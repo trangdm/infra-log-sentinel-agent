@@ -53,14 +53,4 @@ Event: interface_down
 Summary: Uplink port TenGigabitEthernet1/0/48 is down.
 Impact: Possible connectivity loss for downstream segment.
 Action: Check interface status, cable/SFP, peer device, and recent changes.
-Reply ACK within 5 minutes to stop escalation.
-```
-
-## Telegram escalation format
-
-```text
-[ESCALATE][CRITICAL] No ACK received after 5 minutes
-Source: core-sw01.example.local
-Event: interface_down
-Action required: Please investigate immediately.
 ```

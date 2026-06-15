@@ -22,15 +22,32 @@ from infra_log_sentinel.reporting.pdf_report import build_pdf_report
 from infra_log_sentinel.state.log_cursor import LogCursorStore
 from infra_log_sentinel.state.runtime_control import (
     CONTROL_EMAIL_REPORTS,
+    CONTROL_INCIDENT_GENERATION,
     CONTROL_LOG_GENERATION,
     CONTROL_TELEGRAM_ALERTS,
     VALUE_DEMO_LOG_INTERVAL_SECONDS,
+    VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
     RuntimeControlStore,
     now_in_app_timezone,
 )
 
 
-DOMAINS = ("network", "linux", "windows", "vmware")
+DOMAINS = (
+    "network",
+    "fortigate",
+    "juniper",
+    "aruba",
+    "linux",
+    "windows",
+    "vmware",
+    "checkmk",
+    "cacti",
+    "prometheus",
+    "grafana",
+    "elk",
+    "wazuh",
+    "syslog",
+)
 SEVERITIES = ("critical", "error", "warning", "info")
 SEVERITY_ORDER = {"critical": 0, "error": 1, "warning": 2, "info": 3}
 CHANGE_TERMS = ("doi", "set", "edit", "change", "cap nhat", "thanh", "cau hinh")
@@ -335,9 +352,14 @@ def _control_status(settings: Settings) -> str:
         VALUE_DEMO_LOG_INTERVAL_SECONDS,
         settings.demo_log_interval_seconds,
     )
+    incident_interval = store.get_float_value(
+        VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
+        settings.incident_log_interval_seconds,
+    )
     telegram_pause = store.pause_state(CONTROL_TELEGRAM_ALERTS)
     email_pause = store.pause_state(CONTROL_EMAIL_REPORTS)
     loggen_pause = store.pause_state(CONTROL_LOG_GENERATION)
+    incident_pause = store.pause_state(CONTROL_INCIDENT_GENERATION)
     delivery_state, delivery_detail = _telegram_alert_delivery_state(
         settings,
         paused=telegram_pause.paused,
@@ -353,6 +375,8 @@ def _control_status(settings: Settings) -> str:
         f"- email_reports: {email_pause.as_text()}",
         f"- log_generation: {loggen_pause.as_text()}",
         f"- demo_log_interval_seconds: {interval:g}",
+        f"- incident_generation: {incident_pause.as_text()}",
+        f"- incident_log_interval_seconds: {incident_interval:g}",
     ]
     if delivery_detail:
         lines.extend(["", f"Note: {delivery_detail}"])
@@ -478,6 +502,9 @@ def _set_log_interval(settings: Settings, question: str, dry_run: bool) -> str:
         )
 
     interval_seconds = max(interval_seconds, 1.0)
+    is_incident_interval = _mentions_incident_generator(_normalize(question))
+    setting_name = VALUE_INCIDENT_LOG_INTERVAL_SECONDS if is_incident_interval else VALUE_DEMO_LOG_INTERVAL_SECONDS
+    label = "auto incident log generation" if is_incident_interval else "auto log generation"
     if dry_run:
         return (
             "Preview only: mình chưa thay đổi interval auto sinh log.\n"
@@ -486,11 +513,11 @@ def _set_log_interval(settings: Settings, question: str, dry_run: bool) -> str:
         )
 
     RuntimeControlStore(settings.state_db_path).set_value(
-        VALUE_DEMO_LOG_INTERVAL_SECONDS,
+        setting_name,
         f"{interval_seconds:g}",
     )
     return (
-        "Da cap nhat interval auto sinh log.\n"
+        f"Da cap nhat interval {label}.\n"
         f"- Interval moi: {interval_seconds:g} giay\n"
         "- Runtime generator se ap dung o chu ky tiep theo."
     )
@@ -629,12 +656,34 @@ def _looks_like_resume(q: str) -> bool:
         return True
     return "tiep tuc" in q and any(
         term in q
-        for term in ["telegram", "alert", "canh bao", "report", "bao cao", "gmail", "mail", "sinh log", "tat ca"]
+        for term in [
+            "telegram",
+            "alert",
+            "canh bao",
+            "report",
+            "bao cao",
+            "gmail",
+            "mail",
+            "sinh log",
+            "incident",
+            "su co",
+            "rca",
+            "tat ca",
+        ]
     )
 
 
 def _looks_like_interval_update(q: str) -> bool:
-    generator_terms = ["sinh log", "generate log", "generator", "auto log"]
+    generator_terms = [
+        "sinh log",
+        "generate log",
+        "generator",
+        "auto log",
+        "incident log",
+        "incident generator",
+        "rca log",
+        "log su co",
+    ]
     interval_terms = ["interval", "chu ky", "tan suat", "every", "moi"]
 
     if any(term in q for term in generator_terms) and (
@@ -649,7 +698,16 @@ def _looks_like_interval_update(q: str) -> bool:
 
 def _looks_like_interval_clarification(q: str) -> bool:
     interval_terms = ["interval", "chu ky", "tan suat"]
-    generator_terms = ["sinh log", "generate log", "generator", "auto log"]
+    generator_terms = [
+        "sinh log",
+        "generate log",
+        "generator",
+        "auto log",
+        "incident log",
+        "incident generator",
+        "rca log",
+        "log su co",
+    ]
     if any(term in q for term in generator_terms):
         return False
     return (
@@ -736,27 +794,56 @@ def _control_targets(question: str, default_all: bool) -> list[str]:
     targets = []
 
     if any(term in q for term in ["tat ca", "all", "everything"]):
-        return [CONTROL_TELEGRAM_ALERTS, CONTROL_EMAIL_REPORTS, CONTROL_LOG_GENERATION]
+        return [
+            CONTROL_TELEGRAM_ALERTS,
+            CONTROL_EMAIL_REPORTS,
+            CONTROL_LOG_GENERATION,
+            CONTROL_INCIDENT_GENERATION,
+        ]
 
-    if any(term in q for term in ["telegram", "alert", "canh bao", "escalate"]):
+    if any(term in q for term in ["telegram", "alert", "canh bao"]):
         targets.append(CONTROL_TELEGRAM_ALERTS)
     if any(term in q for term in ["report", "bao cao", "gmail", "email", "mail"]):
         targets.append(CONTROL_EMAIL_REPORTS)
-    if any(term in q for term in ["sinh log", "generate log", "generator", "auto log"]):
+    if _mentions_incident_generator(q):
+        targets.append(CONTROL_INCIDENT_GENERATION)
+    elif any(term in q for term in ["sinh log", "generate log", "generator", "auto log"]):
         targets.append(CONTROL_LOG_GENERATION)
 
     if not targets and default_all:
-        return [CONTROL_TELEGRAM_ALERTS, CONTROL_EMAIL_REPORTS, CONTROL_LOG_GENERATION]
+        return [
+            CONTROL_TELEGRAM_ALERTS,
+            CONTROL_EMAIL_REPORTS,
+            CONTROL_LOG_GENERATION,
+            CONTROL_INCIDENT_GENERATION,
+        ]
     return _dedupe(targets)
 
 
 def _control_label(name: str) -> str:
     labels = {
-        CONTROL_TELEGRAM_ALERTS: "Telegram alerts/escalations",
+        CONTROL_TELEGRAM_ALERTS: "Telegram alerts",
         CONTROL_EMAIL_REPORTS: "Gmail scheduled reports",
         CONTROL_LOG_GENERATION: "auto log generation",
+        CONTROL_INCIDENT_GENERATION: "auto incident log generation",
     }
     return labels.get(name, name)
+
+
+def _mentions_incident_generator(q: str) -> bool:
+    return any(
+        term in q
+        for term in [
+            "incident log",
+            "incident generator",
+            "log incident",
+            "log su co",
+            "sinh incident",
+            "sinh su co",
+            "rca log",
+            "root cause log",
+        ]
+    )
 
 
 def _parse_until(question: str) -> datetime | None:

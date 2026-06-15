@@ -1,10 +1,10 @@
 # GreenNode Submission Packet
 
-Last updated: 2026-06-13
+Last updated: 2026-06-15
 
 ## Project
 
-Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure log intelligence. It reads Network, Linux, Windows, and VMware logs, classifies severity, explains probable cause and impact, recommends runbook actions, sends realtime Telegram alerts, tracks ACK/escalation, generates PDF reports, and exposes runtime controls through a professional web chat console.
+Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure log intelligence. It reads infrastructure, security, monitoring, and observability logs, classifies severity, explains probable cause and impact, recommends runbook actions, sends realtime Telegram alerts, generates PDF reports, and exposes runtime controls plus an RCA workspace through a professional web chat console.
 
 ## Links
 
@@ -16,14 +16,35 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 - Rulebook: `https://greennode.ai/claw-a-thon-rulebook`
 - AgentBase skills: `https://github.com/vngcloud/greennode-agentbase-skills`
 
+## Submission Form Answers
+
+- Team name: `TODO: fill registered team name`
+- Track: `Agentic Assistant` (recommended for the chat/RCA copilot positioning)
+- AgentBase project link / GitHub: `https://github.com/trangdm/infra-log-sentinel-agent`
+- Running AgentBase demo link: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
+- Demo video link: `TODO: add 2-3 minute YouTube or OneDrive link shared for VNG domain`
+- Department and members: `TODO: fill 1-3 member names and accdomain@vng.com.vn emails`
+- Team avatar: optional, square PNG/JPG at least 512x512 and under 5 MB
+
+Short use case description for the form:
+
+```text
+Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure teams. It analyzes network, Linux, Windows, VMware, observability, and security logs from a self-contained AgentBase runtime, classifies severity, explains probable causes and impact, and recommends safe runbook actions. Operators can use the hosted web console to ask log questions, generate summaries, pause or resume runtime actions, and run RCA from current logs or generated incident bursts. The agent also supports Telegram alerts and Gmail PDF reporting, making routine incident triage faster and more consistent for NOC/SRE teams.
+```
+
 ## Runtime
 
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
-- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260613-counter-window-reset-v17`
+- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-greennodefix-v35`
+- Runtime image digest: `sha256:4e1fba5a29215f9d61ec23404892ea5140e17bd43f6efb7b2388c074a840a82b`
+- Endpoint version: `33`
+- Runtime status: `ACTIVE`
+- Endpoint status: `ACTIVE`
+- Current replicas: `1`
 - Runtime mode: `runtime_folder`
 - Port: `8080`
 - Required contract: `GET /health`
-- Extra demo APIs: `GET /status`, `POST /chat`, `POST /invocations`, `POST /runtime-controls`, `POST /telegram-alert-counters/reset`
+- Extra demo APIs: `GET /status`, `POST /chat`, `POST /invocations`, `POST /runtime-controls`, `POST /rca/logs/analyze`, `POST /rca/logs/generate`
 
 ## What To Demo
 
@@ -36,38 +57,39 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
    - Gmail reports on/off.
    - Log generator on/off.
    - Edit generator interval and save.
-6. Show Telegram alert counters:
-   - `Today`
-   - `24h`
-   - `7d`
-   - `All`
-   - Reset counters button.
-7. Trigger or wait for realtime Telegram alerts and ACK one alert from Telegram.
+6. Use the RCA workspace:
+   - Enter an impact/symptom.
+   - Choose a lookback window.
+   - Analyze current logs or generate a correlated incident first.
+7. Trigger or wait for realtime Telegram alerts as one-way operational notifications.
 
 ## Key Capabilities
 
-- Multi-domain log parsing: Network, Linux, Windows, VMware.
+- Multi-source log parsing: Network, Fortigate, Juniper, Aruba, Linux Server, Windows Server, VMware, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style logs.
 - Severity classification: info, warning, error, critical.
 - Deterministic operational answers for log summaries, report requests, command explanations, and runtime controls.
 - Conversation-aware chat logic so follow-up questions stay connected to prior context.
-- Professional web UI with priority queue, status indicators, runtime controls, and Telegram alert counters.
+- Professional web UI with priority queue, status indicators, runtime controls, and RCA workspace.
 - Telegram realtime alert delivery for warning/error/critical events.
-- Telegram ACK handling and escalation timeout flow.
 - Gmail PDF report delivery with runtime pause control.
 - Self-contained synthetic log generation for reliable hosted demo behavior.
+- RCA analysis from current logs or generated incident bursts with confidence, evidence, focus terms, and recommended actions.
 
 ## Verification
 
-Verified after deploying v17 on 2026-06-13:
+Verified after deploying v35 on 2026-06-15:
 
 - `/health`: `ok`
-- `/status`: includes `telegram_alert_metrics.windows`
-- Default Telegram counter window: `today`
+- `/status`: `ok`, runtime mode `runtime_folder`
+- Hosted RCA insufficient-data smoke: `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, `llm_guidance=true`
+- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `33`, replica count `1`
 - Runtime timezone: `Asia/Ho_Chi_Minh`
 - Telegram delivery: controlled from the Runtime Controls panel; enable it before the realtime Telegram alert demo.
-- Runtime scheduler worker: `running`
-- UI includes `Today`, `24h`, `7d`, `All`, and `Reset`
-- Core regression test in runtime container: `25 passed`
+- UI includes separate right-panel `Log Sentinel` and `RCA` tabs
+- RCA workspace no longer occupies chat conversation space
+- UI exposes `New chat` context reset and RCA workspace `Clear`
+- Runtime RCA/chat smoke: compact RCA brief with 11 RCA answers, no duplicated legacy RCA sections
+- Core regression tests: `51 passed`
 
 ## Security Notes
 

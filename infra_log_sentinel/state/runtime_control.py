@@ -11,7 +11,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 CONTROL_TELEGRAM_ALERTS = "telegram_alerts"
 CONTROL_EMAIL_REPORTS = "email_reports"
 CONTROL_LOG_GENERATION = "log_generation"
+CONTROL_INCIDENT_GENERATION = "incident_generation"
 VALUE_DEMO_LOG_INTERVAL_SECONDS = "demo_log_interval_seconds"
+VALUE_INCIDENT_LOG_INTERVAL_SECONDS = "incident_log_interval_seconds"
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,7 @@ class RuntimeControlStore:
             CONTROL_TELEGRAM_ALERTS,
             CONTROL_EMAIL_REPORTS,
             CONTROL_LOG_GENERATION,
+            CONTROL_INCIDENT_GENERATION,
         ]
         return {
             "pauses": {
@@ -127,6 +130,7 @@ class RuntimeControlStore:
             },
             "values": {
                 VALUE_DEMO_LOG_INTERVAL_SECONDS: self.get_value(VALUE_DEMO_LOG_INTERVAL_SECONDS),
+                VALUE_INCIDENT_LOG_INTERVAL_SECONDS: self.get_value(VALUE_INCIDENT_LOG_INTERVAL_SECONDS),
             },
         }
 

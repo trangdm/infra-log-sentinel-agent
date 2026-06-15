@@ -62,7 +62,9 @@ CHAT_UI_HTML = r"""<!doctype html>
     }
 
     button,
-    textarea {
+    textarea,
+    input,
+    select {
       font: inherit;
     }
 
@@ -379,6 +381,245 @@ CHAT_UI_HTML = r"""<!doctype html>
       display: flex;
       flex-direction: column;
       gap: 18px;
+    }
+
+    .rca-workspace {
+      width: min(100%, 920px);
+      max-width: 100%;
+      margin: 0 auto 18px;
+      border: 1px solid #b9d9d1;
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius);
+      background: #ffffff;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .rca-workspace-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: start;
+      padding: 13px 15px;
+      background: linear-gradient(90deg, #eefaf6 0%, #f8fbff 100%);
+      border-bottom: 1px solid #d1e6df;
+    }
+
+    .rca-workspace-kicker {
+      margin: 0 0 4px;
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .rca-workspace-title {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.25;
+      font-weight: 950;
+    }
+
+    .rca-confidence-pill {
+      min-width: 72px;
+      padding: 7px 10px;
+      border: 1px solid #b8d8d1;
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--accent-strong);
+      text-align: center;
+      font-size: 20px;
+      font-weight: 950;
+      line-height: 1;
+    }
+
+    .rca-confidence-pill span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .rca-workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(160px, 0.55fr);
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .rca-field {
+      display: grid;
+      gap: 6px;
+      color: var(--muted-strong);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .rca-field-hint {
+      margin: -2px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1.35;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .rca-field textarea,
+    .rca-field input,
+    .rca-field select {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #fbfcfd;
+      color: var(--text);
+      padding: 9px 10px;
+      font-size: 13px;
+      font-weight: 650;
+      text-transform: none;
+      letter-spacing: 0;
+      outline: none;
+    }
+
+    .rca-field textarea {
+      min-height: 76px;
+      resize: vertical;
+    }
+
+    .rca-field input:focus,
+    .rca-field select:focus,
+    .rca-field textarea:focus {
+      border-color: #64bbae;
+      box-shadow: 0 0 0 3px rgba(15, 139, 125, 0.12);
+    }
+
+    .rca-field-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .rca-workspace-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 0 12px 12px;
+    }
+
+    .rca-workspace-button {
+      min-height: 36px;
+      border: 1px solid #94c9be;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #ffffff;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .rca-workspace-button.secondary {
+      background: #ffffff;
+      color: var(--accent-strong);
+    }
+
+    .rca-workspace-button.danger {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+
+    .rca-workspace-button:hover {
+      filter: brightness(0.97);
+    }
+
+    .rca-workspace-button:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    .rca-workspace-result {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+      gap: 10px;
+      padding: 0 12px 12px;
+    }
+
+    .rca-result-block {
+      min-height: 92px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      padding: 10px;
+    }
+
+    .rca-result-block h4 {
+      margin: 0 0 7px;
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .rca-root-cause {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 850;
+    }
+
+    .rca-scope-line {
+      margin: 6px 0 0;
+      color: var(--muted-strong);
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .rca-scope-line strong {
+      color: var(--accent-strong);
+      font-weight: 950;
+    }
+
+    .rca-compact-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 6px;
+    }
+
+    .rca-compact-list li {
+      padding: 7px 8px;
+      border-left: 3px solid #7fbfb3;
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--muted-strong);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .rca-focus-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .rca-focus-chips span {
+      padding: 4px 7px;
+      border: 1px solid #bddbd4;
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 850;
     }
 
     .message {
@@ -1053,6 +1294,25 @@ CHAT_UI_HTML = r"""<!doctype html>
       padding: 10px;
     }
 
+    .composer-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .composer-link {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--accent-strong);
+      min-height: 34px;
+      padding: 0 11px;
+      font-size: 12px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
     .toggle {
       display: inline-flex;
       align-items: center;
@@ -1094,8 +1354,8 @@ CHAT_UI_HTML = r"""<!doctype html>
       border-left: 1px solid var(--line);
       background: #fbfcfd;
       padding: 14px;
-      display: grid;
-      grid-template-rows: minmax(0, 1fr) auto auto auto;
+      display: flex;
+      flex-direction: column;
       gap: 10px;
       min-width: 0;
       height: 100vh;
@@ -1103,7 +1363,54 @@ CHAT_UI_HTML = r"""<!doctype html>
       overscroll-behavior: contain;
     }
 
+    .rail-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      flex: 0 0 auto;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #eef3f2;
+    }
+
+    .rail-tab {
+      min-width: 0;
+      min-height: 36px;
+      border: 0;
+      border-radius: calc(var(--radius) - 2px);
+      background: transparent;
+      color: var(--muted-strong);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .rail-tab.is-active {
+      background: var(--surface);
+      color: var(--accent-strong);
+      box-shadow: 0 1px 4px rgba(17, 24, 39, 0.08);
+    }
+
+    .rail-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      display: none;
+      gap: 10px;
+      overscroll-behavior: contain;
+    }
+
+    .rail-panel.is-active {
+      display: flex;
+      flex-direction: column;
+      align-content: stretch;
+    }
+
     .rail-section {
+      flex: 0 0 auto;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
@@ -1118,10 +1425,51 @@ CHAT_UI_HTML = r"""<!doctype html>
       letter-spacing: 0;
     }
 
-    .rail-section:first-child {
+    .rail-section.alerts-section {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    .alerts-section .alert-list {
+      max-height: 230px;
+    }
+
+    .insight-rail .rca-workspace {
+      flex: 0 0 auto;
+      width: 100%;
+      margin: 0;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .insight-rail .rca-workspace-head {
+      padding: 12px;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .insight-rail .rca-confidence-pill {
+      justify-self: start;
+      min-width: 82px;
+    }
+
+    .insight-rail .rca-workspace-grid,
+    .insight-rail .rca-workspace-result {
+      grid-template-columns: 1fr;
+    }
+
+    .insight-rail .rca-workspace-result {
+      max-height: 360px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .insight-rail .rca-workspace-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .insight-rail .rca-workspace-button {
+      width: 100%;
     }
 
     .alert-list {
@@ -1153,6 +1501,99 @@ CHAT_UI_HTML = r"""<!doctype html>
       color: var(--muted);
       font-size: 11px;
       line-height: 1.35;
+    }
+
+    .rca-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rca-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .rca-head strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .rca-head small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .rca-confidence {
+      min-width: 54px;
+      padding: 5px 7px;
+      border-radius: var(--radius);
+      background: var(--blue-soft);
+      color: var(--blue);
+      text-align: center;
+      font-size: 17px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .rca-cause {
+      padding: 9px;
+      border: 1px solid #cbd8f2;
+      border-left: 3px solid var(--blue);
+      border-radius: var(--radius);
+      background: #f8fbff;
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 760;
+    }
+
+    .rca-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .rca-list span {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .rca-list p {
+      margin: 0;
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      color: var(--muted-strong);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .rca-action {
+      width: 100%;
+      min-height: 30px;
+      border: 1px solid #8fc9bf;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 950;
+      cursor: pointer;
+    }
+
+    .rca-action:hover {
+      background: var(--accent-strong);
     }
 
     .mini-chip {
@@ -1204,156 +1645,6 @@ CHAT_UI_HTML = r"""<!doctype html>
     .runtime-control-card:focus-within {
       border-color: #8fc9bf;
       box-shadow: 0 0 0 3px rgba(15, 139, 125, 0.12);
-    }
-
-    .telegram-counter-panel {
-      padding: 9px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #ffffff;
-    }
-
-    .telegram-counter-toolbar {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .telegram-counter-title {
-      display: block;
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 950;
-      line-height: 1.25;
-    }
-
-    .telegram-counter-window {
-      display: block;
-      margin-top: 2px;
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 850;
-      line-height: 1.3;
-    }
-
-    .telegram-reset {
-      min-height: 26px;
-      padding: 4px 9px;
-      border: 1px solid #f0b6b0;
-      border-radius: var(--radius);
-      background: #fff7f6;
-      color: var(--red);
-      font-size: 11px;
-      font-weight: 950;
-      cursor: pointer;
-    }
-
-    .telegram-reset:hover {
-      background: #ffecea;
-      border-color: #e88f87;
-    }
-
-    .telegram-reset:disabled {
-      cursor: not-allowed;
-      opacity: 0.58;
-    }
-
-    .telegram-window-tabs {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 5px;
-      margin-bottom: 8px;
-      padding: 3px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--surface-soft);
-    }
-
-    .telegram-window-tab {
-      min-height: 25px;
-      border: 0;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--muted-strong);
-      font-size: 11px;
-      font-weight: 950;
-      cursor: pointer;
-    }
-
-    .telegram-window-tab.is-active {
-      background: #ffffff;
-      color: var(--accent-strong);
-      box-shadow: var(--shadow-soft);
-    }
-
-    .telegram-metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px;
-    }
-
-    .telegram-metric {
-      min-height: 58px;
-      padding: 8px 9px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #ffffff;
-    }
-
-    .telegram-metric span {
-      display: block;
-      margin-bottom: 6px;
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .telegram-metric strong {
-      display: block;
-      color: var(--text);
-      font-size: 22px;
-      line-height: 1;
-      font-weight: 950;
-    }
-
-    .telegram-metric.sent {
-      border-color: #c7d7f3;
-      background: var(--blue-soft);
-    }
-
-    .telegram-metric.acked {
-      border-color: #badbc8;
-      background: var(--green-soft);
-    }
-
-    .telegram-metric.pending {
-      border-color: #f2d58a;
-      background: var(--amber-soft);
-    }
-
-    .telegram-metric.escalated {
-      border-color: #f3b9b5;
-      background: var(--red-soft);
-    }
-
-    .telegram-metric.sent strong {
-      color: var(--blue);
-    }
-
-    .telegram-metric.acked strong {
-      color: var(--green);
-    }
-
-    .telegram-metric.pending strong {
-      color: var(--amber);
-    }
-
-    .telegram-metric.escalated strong {
-      color: var(--red);
     }
 
     .runtime-control-head {
@@ -1566,8 +1857,7 @@ CHAT_UI_HTML = r"""<!doctype html>
         grid-column: 1 / -1;
         border-left: 0;
         border-top: 1px solid var(--line);
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        height: min(58vh, 620px);
       }
     }
 
@@ -1597,7 +1887,7 @@ CHAT_UI_HTML = r"""<!doctype html>
       }
 
       .insight-rail {
-        grid-template-columns: 1fr;
+        height: min(62vh, 640px);
       }
     }
 
@@ -1815,6 +2105,7 @@ CHAT_UI_HTML = r"""<!doctype html>
           <button class="quick" type="button" data-prompt="tóm tắt log hôm nay"><span class="icon">S</span><span>Tóm tắt hôm nay</span></button>
           <button class="quick" type="button" data-prompt="alert nào cần ưu tiên và vì sao"><span class="icon">P</span><span>Ưu tiên alert</span></button>
           <button class="quick" type="button" data-prompt="phân tích lỗi nghiêm trọng và đưa command xử lý"><span class="icon">C</span><span>Command xử lý</span></button>
+          <button class="quick" type="button" data-prompt="sinh log su co broadcast loop roi phan tich RCA"><span class="icon">A</span><span>RCA incident</span></button>
           <button class="quick" type="button" data-prompt="trạng thái control"><span class="icon">R</span><span>Runtime control</span></button>
           <button class="quick" type="button" data-prompt="tạm ngừng sinh log trong 5 phút"><span class="icon">G</span><span>Tạm ngừng sinh log</span></button>
           <button class="quick" type="button" data-prompt="gửi báo cáo hôm nay qua Gmail"><span class="icon">M</span><span>Gửi report Gmail</span></button>
@@ -1846,12 +2137,15 @@ CHAT_UI_HTML = r"""<!doctype html>
 
       <footer class="composer">
         <form id="chat-form" class="composer-shell">
-          <textarea id="prompt" rows="2" placeholder="Hỏi agent về log, alert, report, command xử lý hoặc runtime control..."></textarea>
+          <textarea id="prompt" rows="2" placeholder="Hỏi agent về log, RCA, alert, report, command xử lý hoặc runtime control..."></textarea>
           <div class="composer-actions">
-            <label class="toggle">
-              <input id="dry-run" type="checkbox" checked>
-              Preview only
-            </label>
+            <div class="composer-left">
+              <label class="toggle">
+                <input id="dry-run" type="checkbox" checked>
+                Preview only
+              </label>
+              <button id="new-chat" class="composer-link" type="button">New chat</button>
+            </div>
             <button id="send" class="send" type="submit"><span>Send</span><span>›</span></button>
           </div>
         </form>
@@ -1859,7 +2153,13 @@ CHAT_UI_HTML = r"""<!doctype html>
     </main>
 
     <aside class="insight-rail">
-      <section class="rail-section">
+      <div class="rail-tabs" role="tablist" aria-label="Right panel">
+        <button class="rail-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="rail-panel-sentinel" data-rail-tab="sentinel">Log Sentinel</button>
+        <button class="rail-tab" type="button" role="tab" aria-selected="false" aria-controls="rail-panel-rca" data-rail-tab="rca">RCA</button>
+      </div>
+
+      <div id="rail-panel-sentinel" class="rail-panel is-active" role="tabpanel" data-rail-panel="sentinel">
+      <section class="rail-section alerts-section">
         <h3>Priority queue</h3>
         <div id="alert-list" class="alert-list">
           <p class="empty">No alert context loaded yet.</p>
@@ -1879,39 +2179,6 @@ CHAT_UI_HTML = r"""<!doctype html>
             </div>
             <button class="switch" type="button" data-runtime-control="telegram_alerts" aria-label="Toggle Telegram alerts" aria-checked="false"><span></span></button>
           </article>
-          <div class="telegram-counter-panel" aria-label="Telegram alert counters">
-            <div class="telegram-counter-toolbar">
-              <div>
-                <span class="telegram-counter-title">Telegram counters</span>
-                <small id="telegram-window-label" class="telegram-counter-window">Today</small>
-              </div>
-              <button id="telegram-reset-counters" class="telegram-reset" type="button">Reset</button>
-            </div>
-            <div class="telegram-window-tabs" role="tablist" aria-label="Telegram counter window">
-              <button class="telegram-window-tab is-active" type="button" data-telegram-window="today">Today</button>
-              <button class="telegram-window-tab" type="button" data-telegram-window="24h">24h</button>
-              <button class="telegram-window-tab" type="button" data-telegram-window="7d">7d</button>
-              <button class="telegram-window-tab" type="button" data-telegram-window="all">All</button>
-            </div>
-            <div class="telegram-metrics">
-              <div class="telegram-metric sent">
-                <span>Sent</span>
-                <strong id="telegram-sent-count">-</strong>
-              </div>
-              <div class="telegram-metric acked">
-                <span>ACKed</span>
-                <strong id="telegram-acked-count">-</strong>
-              </div>
-              <div class="telegram-metric pending">
-                <span>Pending</span>
-                <strong id="telegram-pending-count">-</strong>
-              </div>
-              <div class="telegram-metric escalated">
-                <span>Escalated</span>
-                <strong id="telegram-escalated-count">-</strong>
-              </div>
-            </div>
-          </div>
           <article class="runtime-control-card">
             <div class="runtime-control-head">
               <div>
@@ -1935,6 +2202,16 @@ CHAT_UI_HTML = r"""<!doctype html>
           <article class="runtime-control-card">
             <div class="runtime-control-head">
               <div>
+                <strong>Incident generator</strong>
+                <small id="control-incident-detail">All RCA incident scenarios</small>
+              </div>
+              <span id="control-incident" class="control-badge disabled">-</span>
+            </div>
+            <button class="switch" type="button" data-runtime-control="incident_generation" aria-label="Toggle incident generator" aria-checked="false"><span></span></button>
+          </article>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
                 <strong>Generator interval</strong>
                 <small id="control-interval-detail">Seconds between generated logs</small>
               </div>
@@ -1943,6 +2220,19 @@ CHAT_UI_HTML = r"""<!doctype html>
             <div class="interval-control">
               <input id="control-interval-input" type="number" min="1" max="86400" step="1" inputmode="numeric" aria-label="Generator interval seconds">
               <button id="control-interval-save" class="control-save" type="button">Save</button>
+            </div>
+          </article>
+          <article class="runtime-control-card">
+            <div class="runtime-control-head">
+              <div>
+                <strong>Incident interval</strong>
+                <small id="control-incident-interval-detail">Seconds between all-scenario incident packs</small>
+              </div>
+              <span id="control-incident-interval" class="control-badge live">-</span>
+            </div>
+            <div class="interval-control">
+              <input id="control-incident-interval-input" type="number" min="1" max="86400" step="1" inputmode="numeric" aria-label="Incident generator interval seconds">
+              <button id="control-incident-interval-save" class="control-save" type="button">Save</button>
             </div>
           </article>
         </div>
@@ -1964,6 +2254,56 @@ CHAT_UI_HTML = r"""<!doctype html>
           <p class="empty">Waiting for status.</p>
         </div>
       </section>
+      </div>
+
+      <div id="rail-panel-rca" class="rail-panel" role="tabpanel" data-rail-panel="rca" hidden>
+        <section class="rca-workspace" aria-label="RCA workspace">
+          <div class="rca-workspace-head">
+            <div>
+              <p class="rca-workspace-kicker">RCA workspace</p>
+              <h3 class="rca-workspace-title">Basic RCA Search</h3>
+            </div>
+            <div id="rca-workspace-confidence" class="rca-confidence-pill">--<span>confidence</span></div>
+          </div>
+          <div class="rca-workspace-grid">
+            <label class="rca-field">
+              Impact / symptom
+              <textarea id="rca-impact" rows="3"></textarea>
+            </label>
+            <div class="rca-field-stack">
+              <label class="rca-field">
+                Window (hours)
+                <input id="rca-lookback" type="number" min="0.25" max="168" step="0.25">
+              </label>
+              <label class="rca-field">
+                From
+                <input id="rca-start" type="datetime-local">
+              </label>
+              <label class="rca-field">
+                To
+                <input id="rca-end" type="datetime-local">
+              </label>
+            </div>
+          </div>
+          <div class="rca-workspace-actions">
+            <button id="rca-analyze" class="rca-workspace-button" type="button">Analyze Current Logs</button>
+            <button id="rca-send-chat" class="rca-workspace-button secondary" type="button">Send As Chat</button>
+            <button id="rca-clear" class="rca-workspace-button danger" type="button">Clear</button>
+          </div>
+          <div id="rca-workspace-result" class="rca-workspace-result">
+            <div class="rca-result-block">
+              <h4>Result</h4>
+              <p class="rca-root-cause">No RCA search has been run in this tab.</p>
+            </div>
+            <div class="rca-result-block">
+              <h4>Evidence & Action</h4>
+              <ul class="rca-compact-list">
+                <li>Enter impact or choose an incident scenario, then run RCA.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
     </aside>
   </div>
 
@@ -1973,12 +2313,13 @@ CHAT_UI_HTML = r"""<!doctype html>
     const promptBox = document.getElementById("prompt");
     const dryRunBox = document.getElementById("dry-run");
     const sendButton = document.getElementById("send");
-    const conversationId = getConversationId();
+    let conversationId = getConversationId();
 
     const state = {
       busy: false,
-      telegramMetricsWindow: "today",
-      telegramMetrics: {}
+      rcaScenarios: [],
+      rcaWorkspaceHasRun: false,
+      rcaWorkspaceAnalysis: null
     };
 
     function getConversationId() {
@@ -1988,14 +2329,45 @@ CHAT_UI_HTML = r"""<!doctype html>
         if (existing) {
           return existing;
         }
-        const generated = window.crypto && window.crypto.randomUUID
-          ? "web-" + window.crypto.randomUUID()
-          : "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        const generated = newConversationId();
         window.localStorage.setItem(key, generated);
         return generated;
       } catch (error) {
-        return "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        return newConversationId();
       }
+    }
+
+    function newConversationId() {
+      return window.crypto && window.crypto.randomUUID
+        ? "web-" + window.crypto.randomUUID()
+        : "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
+    function startNewChatSession() {
+      const key = "infra-log-sentinel-web-session";
+      conversationId = newConversationId();
+      try {
+        window.localStorage.setItem(key, conversationId);
+      } catch (error) {
+        // Ignore storage failures; the in-memory id still separates this browser session.
+      }
+      conversation.innerHTML = "";
+      appendMessage("agent", "**New chat.** Mình đã tách ngữ cảnh hội thoại. Câu tiếp theo sẽ được xử lý như một Log Sentinel/RCA investigation mới.");
+      promptBox.focus();
+    }
+
+    function switchRailTab(target) {
+      const tabName = target === "rca" ? "rca" : "sentinel";
+      document.querySelectorAll("[data-rail-tab]").forEach(function(tab) {
+        const active = tab.dataset.railTab === tabName;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll("[data-rail-panel]").forEach(function(panel) {
+        const active = panel.dataset.railPanel === tabName;
+        panel.classList.toggle("is-active", active);
+        panel.hidden = !active;
+      });
     }
 
     function escapeHtml(value) {
@@ -2060,6 +2432,15 @@ CHAT_UI_HTML = r"""<!doctype html>
 
     function classifyAgentAnswer(text) {
       const key = textKey(text);
+      if (key.includes("aiops rca investigation") || key.includes("aiops rca brief") || key.includes("root cause:") || key.includes("event timeline:")) {
+        return {
+          type: "rca",
+          icon: "RCA",
+          kicker: "Response type",
+          title: "Root cause investigation",
+          subtitle: "Root cause, impact, timeline, evidence and actions are grouped for incident review."
+        };
+      }
       if (key.includes("runbook command") || key.includes("command de xuat") || (key.includes("verify:") && key.includes("remediate:"))) {
         return {
           type: "runbook",
@@ -2637,6 +3018,7 @@ CHAT_UI_HTML = r"""<!doctype html>
       );
       updateControlWidget("email", "email_reports", controlViewState(pauses.email_reports));
       updateControlWidget("loggen", "log_generation", controlViewState(pauses.log_generation));
+      updateControlWidget("incident", "incident_generation", controlViewState(pauses.incident_generation));
 
       const config = status.config || {};
       const values = (status.runtime_controls && status.runtime_controls.values) || {};
@@ -2646,41 +3028,16 @@ CHAT_UI_HTML = r"""<!doctype html>
       if (intervalInput && document.activeElement !== intervalInput) {
         intervalInput.value = interval || "";
       }
-      updateTelegramMetrics(status.telegram_alert_metrics || {});
-    }
-
-    function updateTelegramMetrics(metrics) {
-      state.telegramMetrics = metrics || {};
-      const windows = state.telegramMetrics.windows || {};
-      const preferredWindow = state.telegramMetricsWindow || state.telegramMetrics.default_window || "today";
-      const selectedWindow = windows[preferredWindow] ? preferredWindow : (state.telegramMetrics.default_window || "today");
-      state.telegramMetricsWindow = selectedWindow;
-      const counts = windows[selectedWindow] || state.telegramMetrics;
-      setText("telegram-sent-count", String(counts.sent_total ?? 0));
-      setText("telegram-acked-count", String(counts.acknowledged ?? 0));
-      setText("telegram-pending-count", String(counts.pending ?? 0));
-      setText("telegram-escalated-count", String(counts.escalated ?? 0));
-      updateTelegramMetricWindowUi(selectedWindow, state.telegramMetrics);
-    }
-
-    function updateTelegramMetricWindowUi(selectedWindow, metrics) {
-      const labels = {
-        today: "Today",
-        "24h": "Last 24h",
-        "7d": "Last 7d",
-        all: "All time"
-      };
-      const timezone = metrics && metrics.timezone ? " / " + metrics.timezone : "";
-      setText("telegram-window-label", (labels[selectedWindow] || selectedWindow) + timezone);
-      document.querySelectorAll("[data-telegram-window]").forEach(function(button) {
-        const active = button.dataset.telegramWindow === selectedWindow;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-selected", active ? "true" : "false");
-      });
+      const incidentInterval = values.incident_log_interval_seconds || config.incident_log_interval_seconds || "";
+      setText("control-incident-interval", incidentInterval ? String(incidentInterval) + "s" : "-");
+      const incidentIntervalInput = document.getElementById("control-incident-interval-input");
+      if (incidentIntervalInput && document.activeElement !== incidentIntervalInput) {
+        incidentIntervalInput.value = incidentInterval || "";
+      }
     }
 
     function setRuntimeControlsBusy(value) {
-      document.querySelectorAll("[data-runtime-control], #control-interval-save, #control-interval-input, #telegram-reset-counters").forEach(function(element) {
+      document.querySelectorAll("[data-runtime-control], #control-interval-save, #control-interval-input, #control-incident-interval-save, #control-incident-interval-input").forEach(function(element) {
         element.disabled = value;
       });
     }
@@ -2702,30 +3059,6 @@ CHAT_UI_HTML = r"""<!doctype html>
         await refreshStatus();
       } catch (error) {
         appendMessage("agent", "Không cập nhật được runtime control: " + error.message);
-      } finally {
-        setRuntimeControlsBusy(false);
-      }
-    }
-
-    async function resetTelegramCounters() {
-      const confirmed = window.confirm("Reset Telegram alert counters? This clears stored alert counter history only.");
-      if (!confirmed) {
-        return;
-      }
-      setRuntimeControlsBusy(true);
-      try {
-        const response = await fetch("/telegram-alert-counters/reset", {
-          method: "POST"
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.message || result.error || "Counter reset failed");
-        }
-        updateTelegramMetrics(result.telegram_alert_metrics || {});
-        appendMessage("agent", "Telegram counters reset. Cleared " + String(result.deleted_count || 0) + " stored alert records.");
-        await refreshStatus();
-      } catch (error) {
-        appendMessage("agent", "Could not reset Telegram counters: " + error.message);
       } finally {
         setRuntimeControlsBusy(false);
       }
@@ -2772,6 +3105,232 @@ CHAT_UI_HTML = r"""<!doctype html>
             '<p>' + escapeHtml(alert.event_type || "-") + ': ' + escapeHtml(alert.message || "") + '</p>' +
           '</article>';
       }).join("");
+    }
+
+    function renderRcaWorkspace(rca) {
+      const scenarios = (rca && rca.available_log_scenarios) || [];
+      updateRcaScenarioOptions(scenarios);
+      if (!state.rcaWorkspaceHasRun) {
+        renderRcaWorkspaceEmpty();
+        return;
+      }
+      renderRcaWorkspaceAnalysis(state.rcaWorkspaceAnalysis);
+    }
+
+    function renderRcaWorkspaceEmpty(message) {
+      const confidence = document.getElementById("rca-workspace-confidence");
+      const result = document.getElementById("rca-workspace-result");
+      if (!confidence || !result) {
+        return;
+      }
+      const resultMessage = message || "No RCA search has been run in this tab.";
+      const actionMessage = message
+        ? "The previous RCA result was cleared. Run Analyze Current Logs to search the current incident log corpus."
+        : "Turn on Incident generator in Runtime controls to keep all incident scenarios in current logs, then run Analyze Current Logs.";
+      confidence.innerHTML = '--<span>confidence</span>';
+      result.innerHTML = '' +
+        '<div class="rca-result-block">' +
+          '<h4>Result</h4>' +
+          '<p class="rca-root-cause">' + escapeHtml(resultMessage) + '</p>' +
+        '</div>' +
+        '<div class="rca-result-block">' +
+          '<h4>Evidence & Action</h4>' +
+          '<ul class="rca-compact-list"><li>' + escapeHtml(actionMessage) + '</li></ul>' +
+        '</div>';
+    }
+
+    function updateRcaScenarioOptions(scenarios) {
+      const select = document.getElementById("rca-scenario");
+      if (!select || !scenarios.length) {
+        return;
+      }
+      const current = select.value;
+      const key = scenarios.join("|");
+      if (state.rcaScenarios.join("|") === key) {
+        return;
+      }
+      state.rcaScenarios = scenarios.slice();
+      select.innerHTML = scenarios.map(function(name) {
+        return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+      }).join("");
+      if (scenarios.includes(current)) {
+        select.value = current;
+      }
+    }
+
+    function renderRcaWorkspaceAnalysis(analysis) {
+      const confidence = document.getElementById("rca-workspace-confidence");
+      const result = document.getElementById("rca-workspace-result");
+      if (!confidence || !result) {
+        return;
+      }
+      if (!analysis || !analysis.incident_id || analysis.incident_id === "LOG-RCA-NONE") {
+        const emptyScope = analysis && analysis.scope_label ? String(analysis.scope_label) : "selected log window";
+        confidence.innerHTML = '--<span>confidence</span>';
+        result.innerHTML = '' +
+          '<div class="rca-result-block">' +
+            '<h4>Result</h4>' +
+            '<p class="rca-root-cause">No RCA candidate found from the selected log window.</p>' +
+            '<p class="rca-scope-line"><strong>Scope:</strong> ' + escapeHtml(emptyScope) + '</p>' +
+          '</div>' +
+          '<div class="rca-result-block">' +
+            '<h4>Evidence & Action</h4>' +
+            '<ul class="rca-compact-list"><li>Widen the time window or provide a more specific impact/symptom.</li></ul>' +
+          '</div>';
+        return;
+      }
+      confidence.innerHTML = String(analysis.confidence ?? 0) + '%<span>confidence</span>';
+      const actions = analysis.recommended_actions || {};
+      const evidence = (analysis.evidence || []).slice(0, 4);
+      const immediate = (actions.immediate_actions || []).slice(0, 3);
+      const focusTerms = (analysis.focus_terms || []).slice(0, 6);
+      const timeline = (analysis.timeline || []).slice(0, 3);
+      const scenarioLabel = String(analysis.workspace_scenario || analysis.scenario || "");
+      const modeLabel = analysis.workspace_mode === "generated_incident"
+        ? "generated incident"
+        : analysis.workspace_mode === "current_logs"
+          ? "current logs"
+          : "log window";
+      const scopeLabel = String(analysis.scope_label || (scenarioLabel ? "generated " + scenarioLabel + " incident burst" : modeLabel));
+      const scenarioScope = scenarioLabel
+        ? ' <strong>Scenario:</strong> ' + escapeHtml(scenarioLabel)
+        : "";
+      const evidenceItems = evidence.length ? evidence : timeline.map(function(item) {
+        return [item.timestamp, item.source, item.event_type].filter(Boolean).join(" | ");
+      });
+      const actionItems = immediate.length ? immediate : ["Collect more evidence before remediation."];
+      result.innerHTML = '' +
+        '<div class="rca-result-block">' +
+          '<h4>Most Likely Root Cause</h4>' +
+          '<p class="rca-root-cause">' + escapeHtml(analysis.most_likely_root_cause || analysis.summary || "-") + '</p>' +
+          '<p class="rca-scope-line"><strong>Scope:</strong> ' + escapeHtml(scopeLabel) + scenarioScope + '</p>' +
+          '<div class="rca-focus-chips">' +
+            '<span>' + escapeHtml(String(analysis.severity || "info").toUpperCase()) + '</span>' +
+            '<span>' + escapeHtml(String(analysis.status || "-")) + '</span>' +
+            '<span>' + String(analysis.correlated_events || 0) + ' events</span>' +
+            '<span>' + escapeHtml(modeLabel) + '</span>' +
+            focusTerms.map(function(term) { return '<span>' + escapeHtml(term) + '</span>'; }).join("") +
+          '</div>' +
+        '</div>' +
+        '<div class="rca-result-block">' +
+          '<h4>Evidence & Action</h4>' +
+          '<ul class="rca-compact-list">' +
+            evidenceItems.map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("") +
+            actionItems.map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("") +
+          '</ul>' +
+        '</div>';
+    }
+
+    function setRcaWorkspaceBusy(value) {
+      ["rca-analyze", "rca-send-chat", "rca-clear", "rca-impact", "rca-lookback", "rca-start", "rca-end"].forEach(function(id) {
+        const element = document.getElementById(id);
+        if (element) {
+          element.disabled = value;
+        }
+      });
+    }
+
+    function clearRcaWorkspace() {
+      const impact = document.getElementById("rca-impact");
+      const lookback = document.getElementById("rca-lookback");
+      const start = document.getElementById("rca-start");
+      const end = document.getElementById("rca-end");
+      state.rcaWorkspaceHasRun = false;
+      state.rcaWorkspaceAnalysis = null;
+      if (impact) {
+        impact.value = "";
+      }
+      if (lookback) {
+        lookback.value = "";
+      }
+      if (start) {
+        start.value = "";
+      }
+      if (end) {
+        end.value = "";
+      }
+      renderRcaWorkspaceEmpty();
+      if (impact) {
+        impact.focus();
+      }
+    }
+
+    async function runRcaWorkspace(mode) {
+      const impact = document.getElementById("rca-impact").value.trim();
+      const lookback = Number(document.getElementById("rca-lookback").value || 1);
+      const start = document.getElementById("rca-start").value.trim();
+      const end = document.getElementById("rca-end").value.trim();
+      const scenarioSelect = document.getElementById("rca-scenario");
+      const scenario = scenarioSelect ? scenarioSelect.value || "broadcast_loop" : "broadcast_loop";
+      const endpoint = mode === "generate" ? "/rca/logs/generate" : "/rca/logs/analyze";
+      const payload = {
+        impact: impact,
+        lookback_hours: Number.isFinite(lookback) && lookback > 0 ? lookback : 1
+      };
+      if (start && end) {
+        payload.start_time = start;
+        payload.end_time = end;
+      }
+      if (mode === "generate") {
+        payload.scenario = scenario;
+      }
+      setRcaWorkspaceBusy(true);
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || result.error || "RCA request failed");
+        }
+        state.rcaWorkspaceHasRun = true;
+        const analysis = result.analysis || {};
+        if (mode === "generate") {
+          analysis.workspace_mode = "generated_incident";
+          analysis.workspace_scenario = String(result.scenario || scenario);
+          analysis.scope_label = analysis.scope_label || "generated " + analysis.workspace_scenario + " incident burst";
+        } else {
+          analysis.workspace_mode = "current_logs";
+          analysis.workspace_scenario = "";
+          analysis.scope_label = analysis.scope_label || (start && end ? "selected time range" : "last " + String(payload.lookback_hours) + "h");
+        }
+        state.rcaWorkspaceAnalysis = analysis;
+        renderRcaWorkspaceAnalysis(analysis);
+        switchRailTab("rca");
+        const context = mode === "generate" ? "generated " + scenario : "current logs";
+        appendMessage("agent", "RCA workspace updated (" + context + "): " + String(analysis.incident_id || "analysis complete"));
+        await refreshStatus();
+      } catch (error) {
+        appendMessage("agent", "Không chạy được RCA workspace: " + error.message);
+      } finally {
+        setRcaWorkspaceBusy(false);
+      }
+    }
+
+    function sendRcaWorkspaceAsChat() {
+      const impactBox = document.getElementById("rca-impact");
+      const lookbackBox = document.getElementById("rca-lookback");
+      const startBox = document.getElementById("rca-start");
+      const endBox = document.getElementById("rca-end");
+      const impact = impactBox.value.trim();
+      const lookback = Number(lookbackBox.value || 0);
+      if (!impact) {
+        switchRailTab("rca");
+        appendMessage("agent", "RCA chat cần impact/symptom trước khi gửi sang agent.");
+        impactBox.focus();
+        return;
+      }
+      const windowText = Number.isFinite(lookback) && lookback > 0
+        ? " trong " + String(lookback) + " gio"
+        : "";
+      const rangeText = startBox.value && endBox.value
+        ? " tu " + startBox.value + " den " + endBox.value
+        : windowText;
+      askAgent("phan tich RCA dua tren log hien tai: " + impact + rangeText);
     }
 
     function renderDomainBars(domainCounts) {
@@ -2826,6 +3385,7 @@ CHAT_UI_HTML = r"""<!doctype html>
         updateRuntimeControls(status);
 
         renderAlerts(status.top_alerts || []);
+        renderRcaWorkspace(status.rca || {});
         renderDomainBars(status.domain_counts || {});
       } catch (error) {
         document.getElementById("health-dot").className = "dot bad";
@@ -2848,8 +3408,23 @@ CHAT_UI_HTML = r"""<!doctype html>
     });
 
     document.querySelectorAll("[data-prompt]").forEach(function(button) {
+      button.dataset.promptBound = "true";
       button.addEventListener("click", function() {
         askAgent(button.dataset.prompt);
+      });
+    });
+
+    document.addEventListener("click", function(event) {
+      const button = event.target.closest("[data-prompt]");
+      if (!button || button.dataset.promptBound === "true") {
+        return;
+      }
+      askAgent(button.dataset.prompt);
+    });
+
+    document.querySelectorAll("[data-rail-tab]").forEach(function(tab) {
+      tab.addEventListener("click", function() {
+        switchRailTab(tab.dataset.railTab);
       });
     });
 
@@ -2863,17 +3438,21 @@ CHAT_UI_HTML = r"""<!doctype html>
       });
     });
 
-    document.querySelectorAll("[data-telegram-window]").forEach(function(button) {
-      button.addEventListener("click", function() {
-        state.telegramMetricsWindow = button.dataset.telegramWindow || "today";
-        updateTelegramMetrics(state.telegramMetrics || {});
-      });
+    document.getElementById("rca-analyze").addEventListener("click", function() {
+      runRcaWorkspace("analyze");
     });
 
-    const telegramResetButton = document.getElementById("telegram-reset-counters");
-    if (telegramResetButton) {
-      telegramResetButton.addEventListener("click", resetTelegramCounters);
-    }
+    document.getElementById("rca-send-chat").addEventListener("click", function() {
+      sendRcaWorkspaceAsChat();
+    });
+
+    document.getElementById("rca-clear").addEventListener("click", function() {
+      clearRcaWorkspace();
+    });
+
+    document.getElementById("new-chat").addEventListener("click", function() {
+      startNewChatSession();
+    });
 
     document.getElementById("control-interval-save").addEventListener("click", function() {
       const input = document.getElementById("control-interval-input");
@@ -2885,6 +3464,20 @@ CHAT_UI_HTML = r"""<!doctype html>
       }
       updateRuntimeControl({
         setting: "demo_log_interval_seconds",
+        seconds: seconds
+      });
+    });
+
+    document.getElementById("control-incident-interval-save").addEventListener("click", function() {
+      const input = document.getElementById("control-incident-interval-input");
+      const seconds = Number(input.value);
+      if (!Number.isFinite(seconds) || seconds < 1 || seconds > 86400) {
+        appendMessage("agent", "Incident interval must be between 1 and 86400 seconds.");
+        input.focus();
+        return;
+      }
+      updateRuntimeControl({
+        setting: "incident_log_interval_seconds",
         seconds: seconds
       });
     });

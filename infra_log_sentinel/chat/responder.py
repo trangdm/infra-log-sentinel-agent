@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime
 import re
 
-from infra_log_sentinel.analysis.time_window import filter_events_by_lookback
+from infra_log_sentinel.analysis.time_window import (
+    extract_time_range_from_text,
+    filter_events_by_lookback,
+    filter_events_by_time_range,
+    format_time_range_label,
+)
 from infra_log_sentinel.chat.actions import try_execute_chat_action
 from infra_log_sentinel.chat.conversation import ConversationSnapshot, ConversationStore
 from infra_log_sentinel.chat.intent import (
@@ -12,12 +18,30 @@ from infra_log_sentinel.chat.intent import (
     classify_chat_intent,
     normalize_text,
 )
-from infra_log_sentinel.chat.llm_assistant import answer_with_llm
+from infra_log_sentinel.chat.llm_assistant import (
+    adjudicate_rca_with_llm,
+    answer_with_llm,
+    suggest_rca_next_steps_with_llm,
+)
 from infra_log_sentinel.chat.log_chat import answer_log_question, should_answer_with_rules_first
 from infra_log_sentinel.config import Settings
 from infra_log_sentinel.ingestion.local_folder import iter_log_lines
-from infra_log_sentinel.models import LogEvent
+from infra_log_sentinel.models import LogEvent, RawLogLine
+from infra_log_sentinel.notifications.telegram_sender import send_telegram_message
 from infra_log_sentinel.parsing.log_parser import parse_raw_lines
+from infra_log_sentinel.rca import (
+    RcaIncidentStore,
+    analyze_incident,
+    format_rca_report,
+    format_rca_telegram,
+    generate_incident,
+    list_scenarios,
+)
+from infra_log_sentinel.rca.log_analyzer import analyze_log_events, apply_llm_review
+from infra_log_sentinel.simulator.log_generator import (
+    INCIDENT_SCENARIOS,
+    generate_incident_log_lines,
+)
 
 
 SEVERITY_ORDER = ("critical", "error", "warning", "info")
@@ -37,6 +61,21 @@ def answer_or_execute_chat(
     events = parse_raw_lines(raw_lines)
     intent = classify_chat_intent(question)
 
+    if _is_context_reset_request(question):
+        conversation_store.clear(conversation_channel)
+        return _remember_and_return(
+            conversation_store=conversation_store,
+            channel=conversation_channel,
+            question=question,
+            answer="Đã mở ngữ cảnh hội thoại mới. Các câu tiếp theo sẽ không bám theo RCA/report trước đó.",
+            intent="context_reset",
+            action="context_reset",
+        )
+
+    if _should_start_new_investigation(question, context):
+        conversation_store.clear(conversation_channel)
+        context = conversation_store.get(conversation_channel)
+
     if intent.kind == INTENT_ASSISTANT_FEEDBACK:
         return _remember_and_return(
             conversation_store=conversation_store,
@@ -44,6 +83,22 @@ def answer_or_execute_chat(
             question=question,
             answer=_answer_assistant_feedback(),
             intent=intent.kind,
+        )
+
+    rca_answer = _answer_rca_if_requested(
+        settings=settings,
+        events=events,
+        question=question,
+        dry_run=dry_run,
+    )
+    if rca_answer:
+        return _remember_and_return(
+            conversation_store=conversation_store,
+            channel=conversation_channel,
+            question=question,
+            answer=rca_answer,
+            intent="rca",
+            action="rca",
         )
 
     command_explanation = _answer_command_explanation_if_requested(question)
@@ -119,6 +174,380 @@ def answer_or_execute_chat(
         answer=_answer_general_fallback(),
         intent=intent.kind,
     )
+
+
+def _answer_rca_if_requested(
+    settings: Settings,
+    events: list[LogEvent],
+    question: str,
+    dry_run: bool,
+) -> str:
+    q = normalize_text(question)
+    if not _looks_like_rca_request(q):
+        return ""
+
+    store = RcaIncidentStore(settings.state_db_path)
+    if _looks_like_synthetic_rca_request(q):
+        incident = generate_incident(_extract_rca_scenario(q))
+        analysis = analyze_incident(incident)
+        store.save(incident, analysis)
+        report = format_rca_report(analysis)
+        report += "\n\nMode: synthetic JSON RCA lab."
+    else:
+        generated_count = 0
+        generated = []
+        selected_scenario = _extract_rca_scenario(q)
+        time_scope = _extract_rca_time_scope(question, q, settings.report_lookback_hours, settings.app_timezone)
+        lookback_hours = time_scope["lookback_hours"]
+        focus_text = _rca_focus_text(question)
+        if _looks_like_generate_log_rca_request(q):
+            generated = generate_incident_log_lines(
+                settings.log_root_path,
+                scenario=selected_scenario,
+            )
+            generated_count = len(generated)
+            recent_events = _events_from_generated_log_lines(generated)
+            window_label = f"generated {selected_scenario} incident burst"
+        elif time_scope["start_time"] and time_scope["end_time"]:
+            recent_events = filter_events_by_time_range(
+                events,
+                start_time=time_scope["start_time"],
+                end_time=time_scope["end_time"],
+            )
+            window_label = time_scope["label"]
+        else:
+            recent_events = filter_events_by_lookback(events, lookback_hours)
+            window_label = time_scope["label"]
+        analysis = analyze_log_events(
+            recent_events,
+            lookback_hours=lookback_hours,
+            alert_levels=settings.severity_alert_levels,
+            focus_text=focus_text,
+            window_label=window_label,
+        )
+        _adjudicate_rca_answer_with_llm(settings, question, analysis)
+        if _rca_needs_guidance(analysis):
+            _attach_rca_guidance(
+                settings=settings,
+                events=recent_events,
+                question=question,
+                analysis=analysis,
+            )
+        incident = {
+            "incident_id": analysis["incident_id"],
+            "source": "log_generator" if generated_count else "current_logs",
+            "scenario": selected_scenario if generated_count else "",
+            "generated_count": generated_count,
+            "lookback_hours": lookback_hours,
+            "window_label": window_label,
+            "focus_text": focus_text,
+        }
+        store.save(incident, analysis)
+        report = format_rca_report(analysis)
+        if generated_count:
+            report += (
+                f"\n\nMode: RCA from generated incident burst. "
+                f"Scenario: `{selected_scenario}`. Generated logs: `{generated_count}`."
+            )
+        else:
+            report += f"\n\nMode: RCA from current parsed logs. Scope: `{window_label}`."
+
+    if _rca_should_send_telegram(q):
+        if dry_run:
+            report += "\n\nTelegram: dry-run, RCA message was not sent."
+        else:
+            message_id = send_telegram_message(
+                settings=settings,
+                text=format_rca_telegram(analysis),
+                parse_mode="HTML",
+            )
+            report += f"\n\nTelegram: RCA message sent with message_id `{message_id}`."
+    report += "\n\nTip: dùng `sinh log su co <scenario> roi phan tich RCA` khi cần demo một incident mới."
+    return report
+
+
+def _adjudicate_rca_answer_with_llm(settings: Settings, question: str, analysis: dict[str, object]) -> None:
+    review = adjudicate_rca_with_llm(
+        settings=settings,
+        question=question,
+        analysis=analysis,
+    )
+    if review:
+        apply_llm_review(analysis, review)
+
+
+def _events_from_generated_log_lines(generated: list[object]) -> list[LogEvent]:
+    raw_lines = [
+        RawLogLine(
+            domain=str(item.domain),
+            source_file=item.path,
+            line_number=index,
+            text=str(item.text),
+        )
+        for index, item in enumerate(generated, start=1)
+    ]
+    return parse_raw_lines(raw_lines)
+
+
+def _is_context_reset_request(question: str) -> bool:
+    q = normalize_text(question)
+    reset_terms = (
+        "new chat",
+        "new conversation",
+        "new topic",
+        "reset context",
+        "clear context",
+        "clear chat",
+        "xoa context",
+        "xoa ngu canh",
+        "cuoc hoi thoai moi",
+        "hoi thoai moi",
+        "chu de moi",
+        "bat dau lai",
+    )
+    return any(term in q for term in reset_terms)
+
+
+def _should_start_new_investigation(question: str, context: ConversationSnapshot) -> bool:
+    if not context.last_user_message:
+        return False
+    q = normalize_text(question)
+    current_is_investigation = _looks_like_rca_request(q) or should_answer_with_rules_first(question)
+    previous_was_investigation = context.last_action in {"rca", "inline_report"} or context.last_intent == "log_question"
+    if not current_is_investigation or not previous_was_investigation:
+        return False
+    current = _topic_signature(q)
+    previous = _topic_signature(context.last_user_message)
+    if "khac" in q or "moi" in q:
+        return bool(current)
+    return bool(current and previous and current.isdisjoint(previous))
+
+
+def _topic_signature(value: str) -> set[str]:
+    q = normalize_text(value)
+    markers = {
+        "fortigate",
+        "juniper",
+        "aruba",
+        "linux",
+        "windows",
+        "vmware",
+        "checkmk",
+        "cacti",
+        "prometheus",
+        "grafana",
+        "elk",
+        "wazuh",
+        "syslog",
+        "sqlagent",
+        "sqlserveragent",
+        "bgp",
+        "ospf",
+        "dns",
+        "ssh",
+        "brute",
+        "disk",
+        "datastore",
+        "vpn",
+        "wifi",
+        "wireless",
+        "malware",
+        "service",
+        "app",
+        "api",
+        "database",
+    }
+    signature = {marker for marker in markers if marker in q}
+    signature.update(re.findall(r"\b[a-z0-9-]+(?:\.example\.local|\.local)\b", q))
+    for scenario in list(INCIDENT_SCENARIOS) + list(list_scenarios()):
+        normalized = normalize_text(scenario.replace("_", " "))
+        if normalized and normalized in q:
+            signature.add(normalized)
+    return signature
+
+
+def _rca_needs_guidance(analysis: dict[str, object]) -> bool:
+    confidence = int(analysis.get("confidence") or 0)
+    return analysis.get("status") == "insufficient_data" or confidence < 70
+
+
+def _attach_rca_guidance(
+    settings: Settings,
+    events: list[LogEvent],
+    question: str,
+    analysis: dict[str, object],
+) -> None:
+    guidance = suggest_rca_next_steps_with_llm(
+        settings=settings,
+        events=events,
+        question=question,
+        analysis=analysis,
+        alert_levels=settings.severity_alert_levels,
+    )
+    analysis["llm_guidance"] = guidance or _fallback_rca_guidance(analysis)
+
+
+def _rca_investigation_guidance(
+    settings: Settings,
+    events: list[LogEvent],
+    question: str,
+    analysis: dict[str, object],
+) -> str:
+    guidance = suggest_rca_next_steps_with_llm(
+        settings=settings,
+        events=events,
+        question=question,
+        analysis=analysis,
+        alert_levels=settings.severity_alert_levels,
+    )
+    if guidance:
+        return "\n\n" + guidance
+    missing = analysis.get("missing_data") or []
+    missing_lines = "\n".join(f"- {item}" for item in list(missing)[:4])
+    if not missing_lines:
+        missing_lines = "- Timestamp-aligned application, OS, network, and dependency logs around the impact window."
+    return (
+        "\n\n## RCA chưa đủ dữ liệu"
+        "\n- Kết luận: log hiện tại chưa đủ bằng chứng để xác nhận nguyên nhân gốc."
+        "\n- Cần kiểm tra tiếp: mở rộng time window, đối chiếu log ứng dụng/hệ điều hành/network cùng timestamp, và xác nhận impact thực tế từ service owner."
+        "\n- Dữ liệu còn thiếu:\n"
+        f"{missing_lines}"
+        "\n- Next action: cung cấp thêm impact cụ thể hoặc tăng window RCA rồi chạy lại phân tích."
+    )
+
+
+def _fallback_rca_guidance(analysis: dict[str, object]) -> str:
+    missing = analysis.get("missing_data") or []
+    missing_lines = "\n".join(f"- {item}" for item in list(missing)[:4])
+    if not missing_lines:
+        missing_lines = "- Timestamp-aligned application, OS, network, and dependency logs around the impact window."
+    return (
+        "## LLM guidance: RCA chưa đủ dữ liệu"
+        "\n- Kết luận: log hiện tại chưa đủ bằng chứng để xác nhận nguyên nhân gốc."
+        "\n- Vì sao chưa đủ: chưa có chuỗi event, timestamp, dependency hoặc change record đủ chặt để kết luận."
+        "\n- Dữ liệu cần bổ sung:\n"
+        f"{missing_lines}"
+        "\n- Bước tiếp theo an toàn: mở rộng time window, đối chiếu log/metrics theo cùng timestamp, xác nhận impact với service owner rồi chạy lại RCA."
+    )
+
+
+def _looks_like_rca_request(q: str) -> bool:
+    return any(
+        term in q
+        for term in (
+            "rca",
+            "root cause",
+            "nguyen nhan goc",
+            "phan tich su co",
+            "su co",
+            "incident",
+            "outage",
+            "mat ket noi",
+            "khong truy cap",
+            "khong vao duoc",
+            "internet cham",
+            "mang cham",
+            "app loi",
+            "service down",
+            "impact",
+            "anh huong",
+            "synthetic incident",
+            "demo incident",
+            "incident gia lap",
+            "tao incident",
+        )
+    )
+
+
+def _extract_rca_scenario(q: str) -> str:
+    aliases = {
+        "broadcast": "broadcast_loop",
+        "loop": "broadcast_loop",
+        "mac": "mac_flapping",
+        "fortigate": "fortigate_session_spike",
+        "firewall": "fortigate_session_spike",
+        "dns": "dns_timeout",
+        "disk": "linux_disk_full",
+        "linux": "linux_disk_full",
+        "windows": "windows_service_crash",
+        "service": "windows_service_crash",
+        "vmware": "vmware_datastore_full",
+        "datastore": "vmware_datastore_full",
+        "interface": "interface_flapping",
+        "routing": "routing_issue",
+        "route": "routing_issue",
+        "brute": "brute_force_wazuh",
+        "wazuh": "brute_force_wazuh",
+        "ssh": "brute_force_wazuh",
+    }
+    for scenario in list_scenarios():
+        if scenario in q or scenario.replace("_", " ") in q:
+            return scenario
+    for term, scenario in aliases.items():
+        if term in q:
+            return scenario
+    return "broadcast_loop"
+
+
+def _looks_like_synthetic_rca_request(q: str) -> bool:
+    return any(term in q for term in ("synthetic json", "json incident", "incident json", "lab json"))
+
+
+def _looks_like_generate_log_rca_request(q: str) -> bool:
+    return (
+        any(term in q for term in ("sinh log", "tao log", "generate log", "append log", "log generator"))
+        and _looks_like_rca_request(q)
+    )
+
+
+def _extract_rca_lookback_hours(q: str, default_hours: int) -> float:
+    match = re.search(r"(\d+(?:[.,]\d+)?)\s*(phut|minute|minutes|min|m)\b", q)
+    if match:
+        return max(float(match.group(1).replace(",", ".")) / 60, 1 / 60)
+    match = re.search(r"(\d+(?:[.,]\d+)?)\s*(gio|hour|hours|h)\b", q)
+    if match:
+        return max(float(match.group(1).replace(",", ".")), 1 / 60)
+    if "hom nay" in q or "today" in q:
+        return 24
+    if "gan day" in q or "recent" in q:
+        return min(default_hours, 6)
+    return float(default_hours)
+
+
+def _extract_rca_time_scope(
+    question: str,
+    normalized_question: str,
+    default_hours: int,
+    timezone_name: str,
+) -> dict[str, object]:
+    time_range = extract_time_range_from_text(question, timezone_name=timezone_name)
+    if time_range:
+        start_time, end_time = time_range
+        lookback_hours = max((end_time - start_time).total_seconds() / 3600, 1 / 60)
+        return {
+            "start_time": start_time,
+            "end_time": end_time,
+            "lookback_hours": lookback_hours,
+            "label": format_time_range_label(start_time, end_time),
+        }
+    lookback_hours = _extract_rca_lookback_hours(normalized_question, default_hours)
+    return {
+        "start_time": None,
+        "end_time": None,
+        "lookback_hours": lookback_hours,
+        "label": f"last {lookback_hours:g}h",
+    }
+
+
+def _rca_focus_text(question: str) -> str:
+    cleaned = question.strip()
+    cleaned = re.sub(r"(?i)\b(rca|root cause|phan tich|chan doan|diagnose|check|kiem tra)\b", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:240]
+
+
+def _rca_should_send_telegram(q: str) -> bool:
+    return "telegram" in q and any(term in q for term in ("send", "gui", "push"))
 
 
 def _answer_inline_report_if_requested(

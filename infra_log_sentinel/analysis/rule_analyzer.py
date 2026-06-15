@@ -23,6 +23,9 @@ def classify_severity(raw_text: str, domain: str) -> str:
     if any(
         keyword in text
         for keyword in [
+            "severity=critical",
+            "level=critical",
+            "critical -",
             "critical",
             "alert",
             "all paths down",
@@ -33,6 +36,10 @@ def classify_severity(raw_text: str, domain: str) -> str:
             "critical medium error",
             "dead timer expired",
             "bgp notification sent",
+            "cluster_status=red",
+            "instancedown",
+            "host down",
+            "malware detected",
         ]
     ):
         return "critical"
@@ -47,6 +54,9 @@ def classify_severity(raw_text: str, domain: str) -> str:
     if any(
         keyword in text
         for keyword in [
+            "severity=error",
+            "level=error",
+            "error -",
             "error",
             "failed",
             "failure",
@@ -56,6 +66,9 @@ def classify_severity(raw_text: str, domain: str) -> str:
             "timed out",
             "exit-code",
             "login failed",
+            "scrape failed",
+            "snmp poller timeout",
+            "pipeline blocked",
         ]
     ):
         return "error"
@@ -63,6 +76,10 @@ def classify_severity(raw_text: str, domain: str) -> str:
     if any(
         keyword in text
         for keyword in [
+            "severity=warning",
+            "level=warning",
+            "level=warn",
+            "warning -",
             "warning",
             "deny",
             "failed password",
@@ -73,6 +90,8 @@ def classify_severity(raw_text: str, domain: str) -> str:
             "memory usage is high",
             "path state changed to dead",
             "possible syn flooding",
+            "cluster_status=yellow",
+            "threshold exceeded",
         ]
     ):
         return "warning"
@@ -91,13 +110,39 @@ def detect_event_type(raw_text: str, domain: str) -> str:
         for keyword in ["failed password", "auth_failed", "failed to log on", "login failed"]
     ):
         return "authentication_failure"
-    if any(keyword in text for keyword in ["disk is at or near capacity", "datastore usage"]):
+    if any(keyword in text for keyword in ["disk is at or near capacity", "datastore usage", "traffic threshold exceeded"]):
         return "capacity_warning"
+    if "cluster_status=red" in text:
+        return "search_cluster_red"
+    if "pipeline blocked" in text:
+        return "log_pipeline_blocked"
+    if "file integrity" in text or "checksum changed" in text:
+        return "file_integrity_change"
+    if "malware" in text or "virus" in text or "ips signature" in text:
+        return "security_threat_detected"
+    if "vpn tunnel" in text and "down" in text:
+        return "vpn_tunnel_down"
+    if "ap " in text and "disconnected" in text:
+        return "wireless_ap_down"
+    if "gateway cluster failover" in text:
+        return "wireless_gateway_failover"
+    if "packet loss" in text:
+        return "network_packet_loss"
+    if "snmp poller timeout" in text or "scrape failed" in text or "targetscrapefailed" in text:
+        return "monitoring_polling_failure"
+    if "datasource" in text and "failed" in text:
+        return "monitoring_datasource_failure"
+    if "instancedown" in text or "target has been down" in text or "service is down" in text:
+        return "service_failure"
     if any(keyword in text for keyword in ["service terminated", "main process exited", "failed with result"]):
         return "service_failure"
+    if "dns query timeout" in text:
+        return "dns_timeout"
+    if "upstream timed out" in text or "connection timed out" in text:
+        return "application_timeout"
     if any(
         keyword in text
-        for keyword in ["host connection and power state lost", "host failure", "dashostfailedevent"]
+        for keyword in ["host connection and power state lost", "host failure", "host down", "dashostfailedevent"]
     ):
         return "host_failure"
     if any(
@@ -105,7 +150,7 @@ def detect_event_type(raw_text: str, domain: str) -> str:
         for keyword in ["all paths down", "medium error", "paging operation", "path state changed to dead"]
     ):
         return "storage_path_issue"
-    if any(keyword in text for keyword in ["cpu utilization", "memory usage", "memory pressure"]):
+    if any(keyword in text for keyword in ["cpu utilization", "memory usage", "memory pressure", "out of memory"]):
         return "resource_pressure"
     if "power supply" in text or "ps_fail" in text:
         return "power_supply_failure"
@@ -158,6 +203,66 @@ def explain_event(event_type: str, severity: str, source: str) -> tuple[str, str
             "A critical service or process exited unexpectedly.",
             "Application availability or scheduled jobs may be degraded.",
             "Check service logs, recent deployments, dependency health, and restart policy.",
+        ),
+        "vpn_tunnel_down": (
+            "VPN tunnel went down due to peer, DPD, routing, policy, or internet transport issue.",
+            "Branch or partner connectivity through the tunnel may be interrupted.",
+            "Check IPsec phase status, peer reachability, DPD timers, firewall policy, and recent changes.",
+        ),
+        "wireless_ap_down": (
+            "Wireless access point lost controller connectivity or stopped heartbeating.",
+            "Users attached to the AP may lose Wi-Fi service or roam to weaker coverage.",
+            "Check AP power, switch port, controller reachability, radio health, and AP event history.",
+        ),
+        "wireless_gateway_failover": (
+            "Wireless gateway cluster performed failover because a peer became unreachable.",
+            "Wireless client sessions may be interrupted during convergence.",
+            "Check cluster peer heartbeat, uplink health, controller logs, and failover reason.",
+        ),
+        "monitoring_polling_failure": (
+            "Monitoring system could not scrape or poll the target in time.",
+            "Alert visibility may be degraded, or the monitored target may be unreachable.",
+            "Check target reachability, SNMP/exporter health, timeout settings, and monitoring server load.",
+        ),
+        "monitoring_datasource_failure": (
+            "Dashboard or alerting layer cannot query its monitoring datasource.",
+            "Dashboards and alerts may be stale or unavailable.",
+            "Check datasource health, credentials, network path, query timeout, and backend metrics.",
+        ),
+        "search_cluster_red": (
+            "Elasticsearch cluster is red because primary shards are unavailable.",
+            "Search, indexing, and log analytics may be partially or fully unavailable.",
+            "Check shard allocation, disk watermarks, node health, cluster routing, and recent index changes.",
+        ),
+        "log_pipeline_blocked": (
+            "Log ingestion pipeline is blocked or under backpressure.",
+            "Log delivery may lag, causing delayed alerting and incomplete RCA evidence.",
+            "Check Logstash pipeline workers, queue depth, Elasticsearch ingest capacity, and failed outputs.",
+        ),
+        "security_threat_detected": (
+            "Security control detected malware, IPS, or antivirus activity.",
+            "Endpoint or network segment may be at risk until containment is confirmed.",
+            "Validate scope, isolate affected endpoint if needed, collect indicators, and review related alerts.",
+        ),
+        "file_integrity_change": (
+            "File integrity monitoring detected an unexpected file change.",
+            "Configuration drift or unauthorized modification may affect security posture.",
+            "Validate change ticket, compare file diff, check actor/process, and inspect nearby auth events.",
+        ),
+        "network_packet_loss": (
+            "Monitoring detected packet loss on a host, link, or network path.",
+            "Applications may experience latency, retries, or intermittent failures.",
+            "Check interface counters, path latency, congestion, routing changes, and device health.",
+        ),
+        "dns_timeout": (
+            "DNS service or zone response timed out, often after DNS configuration, reload, or dependency issue.",
+            "Applications depending on name resolution may see connection failures or delayed responses.",
+            "Check DNS service health, zone reload logs, resolver latency, and recent DNS changes.",
+        ),
+        "application_timeout": (
+            "Application dependency timed out while waiting for an upstream response.",
+            "End users may see slow requests, failed logins, or partial service outage.",
+            "Check upstream health, DNS resolution, network path, and application dependency metrics.",
         ),
         "host_failure": (
             "Hypervisor or host connectivity was lost.",

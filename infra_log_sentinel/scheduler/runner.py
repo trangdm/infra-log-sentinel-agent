@@ -11,13 +11,9 @@ from infra_log_sentinel.config import Settings
 from infra_log_sentinel.analysis.time_window import filter_events_by_lookback
 from infra_log_sentinel.ingestion.local_folder import iter_log_lines, iter_new_log_lines
 from infra_log_sentinel.notifications.gmail_sender import send_report_email
-from infra_log_sentinel.notifications.telegram_sender import (
-    check_ack_and_escalations,
-    send_telegram_alerts,
-)
+from infra_log_sentinel.notifications.telegram_sender import send_telegram_alerts
 from infra_log_sentinel.parsing.log_parser import parse_raw_lines
 from infra_log_sentinel.reporting.pdf_report import build_pdf_report
-from infra_log_sentinel.state.alert_store import AlertStore
 from infra_log_sentinel.state.log_cursor import LogCursorStore
 from infra_log_sentinel.state.runtime_control import (
     CONTROL_EMAIL_REPORTS,
@@ -42,8 +38,6 @@ def run_scheduler_once(
     settings: Settings,
     dry_run: bool = False,
     max_alerts: int | None = None,
-    max_escalations: int | None = None,
-    force_escalate: bool = False,
 ) -> SchedulerRunResult:
     result = SchedulerRunResult()
     result.add("Starting one scheduler cycle.")
@@ -55,14 +49,6 @@ def run_scheduler_once(
             max_alerts=max_alerts,
         )
     )
-    result.add(
-        run_ack_check(
-            settings=settings,
-            dry_run=dry_run,
-            max_escalations=max_escalations,
-            force_escalate=force_escalate,
-        )
-    )
     result.add("Scheduler cycle complete.")
     return result
 
@@ -71,7 +57,6 @@ def run_scheduler_forever(
     settings: Settings,
     dry_run: bool = False,
     max_alerts: int | None = None,
-    max_escalations: int | None = None,
 ) -> None:
     print(
         "Scheduler started. "
@@ -91,18 +76,6 @@ def run_scheduler_forever(
             lambda: run_alert_scan(settings=settings, dry_run=dry_run, max_alerts=max_alerts),
         )
     )
-    schedule.every(settings.scan_interval_seconds).seconds.do(
-        lambda: _run_job_safely(
-            "ACK/escalation job",
-            lambda: run_ack_check(
-                settings=settings,
-                dry_run=dry_run,
-                max_escalations=max_escalations,
-                force_escalate=False,
-            )
-        )
-    )
-
     while True:
         schedule.run_pending()
         time.sleep(1)
@@ -164,35 +137,13 @@ def run_alert_scan(
         )
     )
     events = parse_raw_lines(raw_lines)
-    alert_store = None if dry_run else AlertStore(settings.state_db_path)
     telegram_result = send_telegram_alerts(
         settings=settings,
         events=events,
         dry_run=dry_run,
         max_alerts=max_alerts,
-        alert_store=alert_store,
     )
     return f"Alert scan job: read {len(raw_lines)} new log line(s). {telegram_result.message}"
-
-
-def run_ack_check(
-    settings: Settings,
-    dry_run: bool = False,
-    max_escalations: int | None = None,
-    force_escalate: bool = False,
-) -> str:
-    pause_state = RuntimeControlStore(settings.state_db_path).pause_state(CONTROL_TELEGRAM_ALERTS)
-    if pause_state.paused:
-        return f"ACK/escalation job skipped: Telegram alerts paused until {pause_state.paused_until:%Y-%m-%d %H:%M:%S}."
-
-    ack_result = check_ack_and_escalations(
-        settings=settings,
-        alert_store=AlertStore(settings.state_db_path),
-        dry_run=dry_run,
-        max_escalations=max_escalations,
-        force_escalate=force_escalate,
-    )
-    return f"ACK/escalation job: {ack_result.message}"
 
 
 def _load_events(settings: Settings):

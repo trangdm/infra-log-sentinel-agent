@@ -11,7 +11,22 @@ INTENT_AMBIGUOUS_OPERATIONAL_CHANGE = "ambiguous_operational_change"
 INTENT_ASSISTANT_FEEDBACK = "assistant_feedback"
 INTENT_GENERAL_QUESTION = "general_question"
 
-DOMAINS = ("network", "linux", "windows", "vmware")
+DOMAINS = (
+    "network",
+    "fortigate",
+    "juniper",
+    "aruba",
+    "linux",
+    "windows",
+    "vmware",
+    "checkmk",
+    "cacti",
+    "prometheus",
+    "grafana",
+    "elk",
+    "wazuh",
+    "syslog",
+)
 SEVERITIES = ("critical", "error", "warning", "info")
 
 CHANGE_TERMS = ("doi", "set", "edit", "change", "cap nhat", "thanh", "cau hinh")

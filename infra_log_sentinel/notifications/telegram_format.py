@@ -36,28 +36,17 @@ INTENT_BADGE = {
 }
 
 
-def format_chat_reply_for_telegram(question: str, answer: str, ack_count: int = 0) -> str:
-    ack_block = _ack_block(ack_count)
-    summary = _format_summary_answer(question, answer, ack_block)
+def format_chat_reply_for_telegram(question: str, answer: str) -> str:
+    summary = _format_summary_answer(question, answer)
     if summary:
         return summary
 
-    runbook = _format_runbook_answer(question, answer, ack_block)
+    runbook = _format_runbook_answer(question, answer)
     if runbook:
         return runbook
 
     intent = classify_chat_intent(question)
-    return _format_generic_answer(question, answer, ack_block, intent.kind)
-
-
-def format_ack_reply_for_telegram(ack_count: int) -> str:
-    return "\n".join(
-        [
-            "✅ <b>INFRA-LOG-SENTINEL ACK</b>",
-            f"<b>Pending alerts:</b> <code>{ack_count}</code>",
-            "<b>Status:</b> escalation timer updated.",
-        ]
-    )
+    return _format_generic_answer(question, answer, intent.kind)
 
 
 def format_help_for_telegram() -> str:
@@ -73,13 +62,11 @@ def format_help_for_telegram() -> str:
             "1. <code>xuất báo cáo PDF 24 giờ gần nhất</code>",
             "2. <code>gửi báo cáo hôm nay qua Gmail</code>",
             "3. <code>export alert critical ra CSV</code>",
-            "",
-            "✅ Reply <code>ACK</code> to acknowledge pending alerts.",
         ]
     )
 
 
-def _format_summary_answer(question: str, answer: str, ack_block: str) -> str:
+def _format_summary_answer(question: str, answer: str) -> str:
     if "Theo severity:" not in answer or "Theo domain:" not in answer:
         return ""
 
@@ -93,9 +80,6 @@ def _format_summary_answer(question: str, answer: str, ack_block: str) -> str:
         f"<b>Question:</b> {escape(question)}",
         "<b>Mode:</b> Log summary",
     ]
-    if ack_block:
-        lines.extend(["", ack_block])
-
     lines.extend(
         [
             "",
@@ -121,20 +105,18 @@ def _format_summary_answer(question: str, answer: str, ack_block: str) -> str:
     return "\n".join(lines)
 
 
-def _format_runbook_answer(question: str, answer: str, ack_block: str) -> str:
+def _format_runbook_answer(question: str, answer: str) -> str:
     if "Runbook command" not in answer and "command" not in question.lower():
         return ""
 
     issues = _parse_runbook_issues(answer)
     if not issues:
-        return _format_generic_answer(question, answer, ack_block, INTENT_LOG_QUESTION)
+        return _format_generic_answer(question, answer, INTENT_LOG_QUESTION)
 
     lines = [
         "🛠 <b>INFRA-LOG-SENTINEL Runbook</b>",
         f"<b>Question:</b> {escape(question)}",
     ]
-    if ack_block:
-        lines.extend(["", ack_block])
 
     for index, issue in enumerate(issues[:2], start=1):
         lines.extend(
@@ -168,22 +150,14 @@ def _format_runbook_answer(question: str, answer: str, ack_block: str) -> str:
     return "\n".join(lines)
 
 
-def _format_generic_answer(question: str, answer: str, ack_block: str, intent_kind: str) -> str:
+def _format_generic_answer(question: str, answer: str, intent_kind: str) -> str:
     badge = INTENT_BADGE.get(intent_kind, "💬 Assistant")
     lines = [
         f"{badge} <b>INFRA-LOG-SENTINEL</b>",
         f"<b>Question:</b> {escape(question)}",
     ]
-    if ack_block:
-        lines.extend(["", ack_block])
     lines.extend(["", _telegramize_plain_text(_trim(answer, MAX_GENERIC_BODY))])
     return "\n".join(lines)
-
-
-def _ack_block(ack_count: int) -> str:
-    if ack_count <= 0:
-        return ""
-    return f"✅ <b>ACK:</b> recorded for <code>{ack_count}</code> pending alert(s)."
 
 
 def _severity_overview(values: dict[str, int]) -> str:

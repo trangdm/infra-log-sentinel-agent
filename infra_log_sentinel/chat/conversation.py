@@ -96,6 +96,12 @@ class ConversationStore:
             )
             connection.commit()
 
+    def clear(self, channel: str) -> None:
+        self._ensure_schema()
+        with closing(self._connect()) as connection:
+            connection.execute("DELETE FROM conversation_state WHERE channel = ?", (channel,))
+            connection.commit()
+
     def _ensure_schema(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as connection:

@@ -44,7 +44,7 @@ def parse_raw_lines(raw_lines: list[RawLogLine]) -> list[LogEvent]:
 
 
 def _split_line(raw: RawLogLine) -> tuple[str, str, str]:
-    if raw.domain == "linux":
+    if raw.domain in {"linux", "syslog"}:
         match = LINUX_SYSLOG_RE.match(raw.text)
     else:
         match = ISO_LINE_RE.match(raw.text)

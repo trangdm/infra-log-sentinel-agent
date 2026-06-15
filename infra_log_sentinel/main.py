@@ -13,7 +13,6 @@ from .notifications.gmail_sender import GmailConfigError, GmailSendError, send_r
 from .notifications.telegram_sender import (
     TelegramConfigError,
     TelegramSendError,
-    check_ack_and_escalations,
     check_telegram_health,
     send_telegram_alerts,
 )
@@ -26,7 +25,6 @@ from .parsing.log_parser import parse_raw_lines
 from .reporting.pdf_report import build_pdf_report
 from .scheduler.runner import run_scheduler_forever, run_scheduler_once
 from .simulator.log_generator import generate_log_lines
-from .state.alert_store import AlertStore
 from .state.log_cursor import LogCursorStore
 
 
@@ -53,7 +51,6 @@ def main() -> None:
         action="store_true",
         help="Mark current Telegram updates as already consumed",
     )
-    parser.add_argument("--check-acks", action="store_true", help="Check Telegram ACK replies and escalate expired alerts")
     parser.add_argument("--init-log-cursor", action="store_true", help="Mark current log folder content as already consumed")
     parser.add_argument("--new-only", action="store_true", help="Process only new log lines since the last cursor update")
     parser.add_argument("--scheduler", action="store_true", help="Run the local scheduler loop")
@@ -65,8 +62,6 @@ def main() -> None:
     parser.add_argument("--generate-log-severity", default="abnormal", help="Synthetic log severity: abnormal, all, info, warning, error, critical")
     parser.add_argument("--dry-run", action="store_true", help="Preview delivery actions without sending messages")
     parser.add_argument("--max-alerts", type=int, default=None, help="Limit alert count for local testing")
-    parser.add_argument("--max-escalations", type=int, default=None, help="Limit escalation count for local testing")
-    parser.add_argument("--force-escalate", action="store_true", help="Escalate pending alerts immediately for local testing")
     args = parser.parse_args()
 
     settings = load_settings()
@@ -79,7 +74,6 @@ def main() -> None:
         and not args.telegram_chat
         and not args.telegram_chat_once
         and not args.init_telegram_chat
-        and not args.check_acks
         and not args.init_log_cursor
         and not args.scheduler
         and not args.scheduler_once
@@ -98,7 +92,6 @@ def main() -> None:
         print("Run with --telegram-alerts to send warning/error/critical alerts through Telegram.")
         print("Run with --telegram-health to test Telegram connectivity.")
         print("Run with --telegram-chat to answer Telegram messages through the configured chat.")
-        print("Run with --check-acks to process Telegram ACK replies and escalations.")
         print("Run with --init-log-cursor to baseline existing logs before realtime alerting.")
         print("Run with --scheduler to start the local scheduler loop.")
         print("Run with --chat \"your question\" to ask about parsed logs.")
@@ -169,7 +162,6 @@ def main() -> None:
         print(result.message)
 
     if args.telegram_alerts:
-        alert_store = None if args.dry_run else AlertStore(settings.state_db_path)
         if args.new_only:
             cursor_store = LogCursorStore(settings.state_db_path)
             raw_lines = list(
@@ -187,7 +179,6 @@ def main() -> None:
                 events=events,
                 dry_run=args.dry_run,
                 max_alerts=args.max_alerts,
-                alert_store=alert_store,
             )
         except (TelegramConfigError, TelegramSendError) as exc:
             raise SystemExit(str(exc)) from exc
@@ -232,27 +223,12 @@ def main() -> None:
         except (TelegramConfigError, TelegramSendError) as exc:
             raise SystemExit(str(exc)) from exc
 
-    if args.check_acks:
-        try:
-            result = check_ack_and_escalations(
-                settings=settings,
-                alert_store=AlertStore(settings.state_db_path),
-                dry_run=args.dry_run,
-                max_escalations=args.max_escalations,
-                force_escalate=args.force_escalate,
-            )
-        except (TelegramConfigError, TelegramSendError) as exc:
-            raise SystemExit(str(exc)) from exc
-        print(result.message)
-
     if args.scheduler_once:
         try:
             result = run_scheduler_once(
                 settings=settings,
                 dry_run=args.dry_run,
                 max_alerts=args.max_alerts,
-                max_escalations=args.max_escalations,
-                force_escalate=args.force_escalate,
             )
         except (GmailConfigError, GmailSendError, TelegramConfigError, TelegramSendError) as exc:
             raise SystemExit(str(exc)) from exc
@@ -264,7 +240,6 @@ def main() -> None:
                 settings=settings,
                 dry_run=args.dry_run,
                 max_alerts=args.max_alerts,
-                max_escalations=args.max_escalations,
             )
         except (GmailConfigError, GmailSendError, TelegramConfigError, TelegramSendError) as exc:
             raise SystemExit(str(exc)) from exc

@@ -19,6 +19,8 @@ class Settings:
     demo_log_interval_seconds: float
     demo_log_domain: str
     demo_log_severity: str
+    incident_log_generator_enabled: bool
+    incident_log_interval_seconds: float
     runtime_scheduler_enabled: bool
     runtime_scheduler_dry_run: bool
     runtime_scheduler_max_alerts: int | None
@@ -81,6 +83,8 @@ def load_settings(env_file: str | None = None) -> Settings:
         demo_log_interval_seconds=float(os.getenv("DEMO_LOG_INTERVAL_SECONDS", "30")),
         demo_log_domain=os.getenv("DEMO_LOG_DOMAIN", "all"),
         demo_log_severity=os.getenv("DEMO_LOG_SEVERITY", "abnormal"),
+        incident_log_generator_enabled=_bool_env("INCIDENT_LOG_GENERATOR_ENABLED", False),
+        incident_log_interval_seconds=float(os.getenv("INCIDENT_LOG_INTERVAL_SECONDS", "300")),
         runtime_scheduler_enabled=_bool_env("RUNTIME_SCHEDULER_ENABLED", False),
         runtime_scheduler_dry_run=_bool_env("RUNTIME_SCHEDULER_DRY_RUN", True),
         runtime_scheduler_max_alerts=_optional_int_env("RUNTIME_SCHEDULER_MAX_ALERTS"),

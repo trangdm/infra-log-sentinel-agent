@@ -12,26 +12,47 @@ import time
 import traceback
 from typing import Any
 from urllib.parse import urlparse
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from infra_log_sentinel.analysis.runbook import recommend_commands
-from infra_log_sentinel.analysis.time_window import filter_events_by_lookback
+from infra_log_sentinel.analysis.time_window import (
+    filter_events_by_lookback,
+    filter_events_by_time_range,
+    format_time_range_label,
+    parse_user_datetime,
+)
+from infra_log_sentinel.chat.llm_assistant import adjudicate_rca_with_llm, suggest_rca_next_steps_with_llm
 from infra_log_sentinel.chat.responder import answer_or_execute_chat
 from infra_log_sentinel.config import Settings, load_settings
 from infra_log_sentinel.ingestion.local_folder import SUPPORTED_EXTENSIONS, iter_log_lines
-from infra_log_sentinel.models import LogEvent
+from infra_log_sentinel.models import LogEvent, RawLogLine
 from infra_log_sentinel.parsing.log_parser import parse_raw_lines
 from infra_log_sentinel.notifications.telegram_chat import run_telegram_chat_forever
+from infra_log_sentinel.notifications.telegram_sender import send_telegram_message
+from infra_log_sentinel.rca import (
+    RcaIncidentStore,
+    analyze_incident,
+    format_rca_telegram,
+    generate_incident,
+    list_scenarios,
+)
+from infra_log_sentinel.rca.log_analyzer import analyze_log_events, apply_llm_review, log_rca_compact
 from infra_log_sentinel.scheduler.runner import run_scheduler_forever
-from infra_log_sentinel.simulator.log_generator import DOMAINS, generate_log_lines, generate_one_log_line
+from infra_log_sentinel.simulator.log_generator import (
+    DOMAINS,
+    INCIDENT_SCENARIOS,
+    generate_incident_log_lines,
+    generate_log_lines,
+    generate_one_log_line,
+)
 from infra_log_sentinel.state.runtime_control import (
     CONTROL_EMAIL_REPORTS,
+    CONTROL_INCIDENT_GENERATION,
     CONTROL_LOG_GENERATION,
     CONTROL_TELEGRAM_ALERTS,
     VALUE_DEMO_LOG_INTERVAL_SECONDS,
+    VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
     RuntimeControlStore,
 )
-from infra_log_sentinel.state.alert_store import AlertStore
 from infra_log_sentinel.web_ui import render_chat_ui
 
 
@@ -41,6 +62,7 @@ RUNTIME_CONTROL_LABELS = {
     CONTROL_TELEGRAM_ALERTS: "Telegram alerts",
     CONTROL_EMAIL_REPORTS: "Gmail reports",
     CONTROL_LOG_GENERATION: "Log generator",
+    CONTROL_INCIDENT_GENERATION: "Incident generator",
 }
 WORKER_STATUS_LOCK = threading.Lock()
 WORKER_STATUS: dict[str, dict[str, str]] = {}
@@ -101,19 +123,108 @@ def _handler_for(settings: Settings) -> type[BaseHTTPRequestHandler]:
                             "invocations": "POST /invocations",
                             "chat": "POST /chat",
                             "runtime_controls": "POST /runtime-controls",
-                            "telegram_alert_counters_reset": "POST /telegram-alert-counters/reset",
+                            "rca_generate": "POST /demo/incidents/generate",
+                            "rca_analyze": "POST /incidents/analyze",
+                            "rca_latest": "GET /incidents/latest",
+                            "rca_telegram_test": "POST /telegram/test",
+                            "log_rca_generate": "POST /rca/logs/generate",
+                            "log_rca_analyze": "POST /rca/logs/analyze",
                         },
                     },
                 )
+                return
+
+            if path == "/incidents/latest":
+                latest = RcaIncidentStore(settings.state_db_path).latest()
+                if latest is None:
+                    self._write_error(HTTPStatus.NOT_FOUND, "No RCA incident has been analyzed yet.")
+                    return
+                self._write_json(HTTPStatus.OK, {"status": "ok", **latest})
                 return
 
             self._write_error(HTTPStatus.NOT_FOUND, f"Unknown path: {path}")
 
         def do_POST(self) -> None:
             path = _normalized_path(self.path)
-            if path == "/telegram-alert-counters/reset":
+            if path == "/demo/incidents/generate":
+                payload = self._read_optional_json()
+                if payload is None:
+                    return
                 try:
-                    result = _reset_telegram_alert_counters(settings)
+                    result = _generate_rca_incident(settings, payload)
+                except Exception as exc:  # pragma: no cover - defensive API boundary
+                    traceback.print_exc()
+                    self._write_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    return
+                self._write_json(HTTPStatus.OK, result)
+                return
+
+            if path == "/rca/logs/generate":
+                payload = self._read_optional_json()
+                if payload is None:
+                    return
+                try:
+                    result = _generate_log_rca_incident(settings, payload)
+                except ValueError as exc:
+                    self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
+                    return
+                except Exception as exc:  # pragma: no cover - defensive API boundary
+                    traceback.print_exc()
+                    self._write_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    return
+                self._write_json(HTTPStatus.OK, result)
+                return
+
+            if path == "/rca/logs/analyze":
+                payload = self._read_optional_json()
+                if payload is None:
+                    return
+                try:
+                    result = _analyze_current_logs_for_rca(settings, payload)
+                except Exception as exc:  # pragma: no cover - defensive API boundary
+                    traceback.print_exc()
+                    self._write_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    return
+                self._write_json(HTTPStatus.OK, result)
+                return
+
+            if path == "/incidents/analyze":
+                payload = self._read_optional_json()
+                if payload is None:
+                    return
+                try:
+                    result = _analyze_rca_incident(settings, payload)
+                except ValueError as exc:
+                    self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
+                    return
+                except Exception as exc:  # pragma: no cover - defensive API boundary
+                    traceback.print_exc()
+                    self._write_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    return
+                self._write_json(HTTPStatus.OK, result)
+                return
+
+            if path == "/telegram/test":
+                payload = self._read_optional_json()
+                if payload is None:
+                    return
+                try:
+                    result = _send_rca_telegram_test(settings, payload)
+                except ValueError as exc:
+                    self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
+                    return
                 except Exception as exc:  # pragma: no cover - defensive API boundary
                     traceback.print_exc()
                     self._write_error(
@@ -208,6 +319,12 @@ def _handler_for(settings: Settings) -> type[BaseHTTPRequestHandler]:
                 return None
             return payload
 
+        def _read_optional_json(self) -> dict[str, Any] | None:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0:
+                return {}
+            return self._read_json()
+
         def _write_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
             body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
             self.send_response(status.value)
@@ -276,6 +393,20 @@ def _update_runtime_control(settings: Settings, payload: dict[str, Any]) -> dict
             "status": _build_status(settings),
         }
 
+    if setting == VALUE_INCIDENT_LOG_INTERVAL_SECONDS:
+        seconds = _payload_float(payload.get("seconds"))
+        if seconds is None:
+            raise ValueError("Incident generator interval update requires numeric field: seconds.")
+        if seconds < 1 or seconds > 86400:
+            raise ValueError("Incident generator interval must be between 1 and 86400 seconds.")
+        stored_value = str(int(seconds)) if seconds.is_integer() else f"{seconds:g}"
+        store.set_value(VALUE_INCIDENT_LOG_INTERVAL_SECONDS, stored_value)
+        return {
+            "service": SERVICE_NAME,
+            "message": f"Incident generator interval saved: {stored_value}s.",
+            "status": _build_status(settings),
+        }
+
     raise ValueError("Request must include a supported control or setting.")
 
 
@@ -304,14 +435,286 @@ def _payload_float(value: Any) -> float | None:
     return None
 
 
+def _generate_rca_incident(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
+    scenario = _payload_text(payload.get("scenario") or payload.get("type") or payload.get("case"))
+    incident = generate_incident(scenario)
+    analysis = analyze_incident(incident)
+    RcaIncidentStore(settings.state_db_path).save(incident, analysis)
+    telegram_message_id = _send_rca_if_requested(settings, payload, analysis)
+    return {
+        "status": "ok",
+        "available_scenarios": list_scenarios(),
+        "incident": incident,
+        "analysis": analysis,
+        "telegram_message_id": telegram_message_id,
+    }
+
+
+def _analyze_rca_incident(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
+    incident = payload.get("incident") if isinstance(payload.get("incident"), dict) else payload
+    if not isinstance(incident, dict) or not incident:
+        raise ValueError("Request JSON must include an incident object or incident fields.")
+    analysis = analyze_incident(incident)
+    RcaIncidentStore(settings.state_db_path).save(incident, analysis)
+    telegram_message_id = _send_rca_if_requested(settings, payload, analysis)
+    return {
+        "status": "ok",
+        "incident": incident,
+        "analysis": analysis,
+        "telegram_message_id": telegram_message_id,
+    }
+
+
+def _send_rca_telegram_test(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
+    store = RcaIncidentStore(settings.state_db_path)
+    incident_id = _payload_text(payload.get("incident_id"))
+    record = store.get(incident_id) if incident_id else store.latest()
+    if record is None:
+        incident = generate_incident(_payload_text(payload.get("scenario")))
+        analysis = analyze_incident(incident)
+        store.save(incident, analysis)
+        record = {"incident": incident, "analysis": analysis}
+
+    analysis = record["analysis"]
+    message = _payload_text(payload.get("message")) or format_rca_telegram(analysis)
+    dry_run = _payload_bool(payload.get("dry_run")) is True
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "incident_id": analysis.get("incident_id"),
+            "message": message,
+        }
+
+    message_id = send_telegram_message(settings=settings, text=message, parse_mode="HTML")
+    return {
+        "status": "sent",
+        "incident_id": analysis.get("incident_id"),
+        "telegram_message_id": message_id,
+    }
+
+
+def _send_rca_if_requested(
+    settings: Settings,
+    payload: dict[str, Any],
+    analysis: dict[str, Any],
+) -> int | None:
+    if _payload_bool(payload.get("send_telegram")) is not True:
+        return None
+    return send_telegram_message(
+        settings=settings,
+        text=format_rca_telegram(analysis),
+        parse_mode="HTML",
+    )
+
+
+def _generate_log_rca_incident(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
+    scenario = _payload_text(payload.get("scenario") or payload.get("type") or payload.get("case"))
+    selected_scenario = scenario or "broadcast_loop"
+    generated = generate_incident_log_lines(settings.log_root_path, scenario or "broadcast_loop")
+    lookback_hours = _payload_float(payload.get("lookback_hours")) or settings.report_lookback_hours
+    focus_text = (
+        _payload_text(payload.get("focus") or payload.get("impact") or payload.get("description"))
+        or selected_scenario.replace("_", " ")
+    )
+    generated_events = _events_from_generated_log_lines(generated)
+    analysis = analyze_log_events(
+        generated_events,
+        lookback_hours=lookback_hours,
+        alert_levels=settings.severity_alert_levels,
+        focus_text=focus_text,
+        window_label=f"generated {selected_scenario} incident burst",
+    )
+    _enrich_log_rca_with_llm(settings, focus_text or selected_scenario, analysis, generated_events)
+    incident = {
+        "incident_id": analysis["incident_id"],
+        "source": "log_generator",
+        "scenario": selected_scenario,
+        "focus_text": focus_text,
+        "lookback_hours": lookback_hours,
+        "generated_logs": [
+            {
+                "domain": item.domain,
+                "severity": item.severity,
+                "path": str(item.path),
+                "text": item.text,
+            }
+            for item in generated
+        ],
+    }
+    RcaIncidentStore(settings.state_db_path).save(incident, analysis)
+    telegram_message_id = _send_rca_if_requested(settings, payload, analysis)
+    return {
+        "status": "ok",
+        "available_scenarios": list(INCIDENT_SCENARIOS),
+        "scenario": selected_scenario,
+        "generated_count": len(generated),
+        "generated_logs": incident["generated_logs"],
+        "analysis": analysis,
+        "telegram_message_id": telegram_message_id,
+    }
+
+
+def _analyze_current_logs_for_rca(settings: Settings, payload: dict[str, Any]) -> dict[str, Any]:
+    lookback_hours = _payload_float(payload.get("lookback_hours")) or settings.report_lookback_hours
+    focus_text = _payload_text(payload.get("focus") or payload.get("impact") or payload.get("description"))
+    start_time = parse_user_datetime(_payload_text(payload.get("start_time") or payload.get("from")), settings.app_timezone)
+    end_time = parse_user_datetime(_payload_text(payload.get("end_time") or payload.get("to")), settings.app_timezone)
+    analysis = _analyze_logs_for_rca(
+        settings,
+        lookback_hours=lookback_hours,
+        focus_text=focus_text,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    recent_events = _events_for_rca_context(
+        settings,
+        lookback_hours=lookback_hours,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    _enrich_log_rca_with_llm(settings, focus_text, analysis, recent_events)
+    window_label = analysis.get("scope_label") or f"last {lookback_hours:g}h"
+    incident = {
+        "incident_id": analysis["incident_id"],
+        "source": "current_logs",
+        "lookback_hours": lookback_hours,
+        "window_label": window_label,
+        "focus_text": focus_text,
+        "analyzed_events": analysis.get("analyzed_events", 0),
+    }
+    RcaIncidentStore(settings.state_db_path).save(incident, analysis)
+    telegram_message_id = _send_rca_if_requested(settings, payload, analysis)
+    return {
+        "status": "ok",
+        "analysis": analysis,
+        "telegram_message_id": telegram_message_id,
+    }
+
+
+def _enrich_log_rca_with_llm(
+    settings: Settings,
+    question: str,
+    analysis: dict[str, Any],
+    events: list[LogEvent],
+) -> None:
+    _adjudicate_log_rca_with_llm(settings, question, analysis)
+    if _rca_needs_llm_guidance(analysis):
+        guidance = suggest_rca_next_steps_with_llm(
+            settings=settings,
+            events=events,
+            question=question or str(analysis.get("summary") or ""),
+            analysis=analysis,
+            alert_levels=settings.severity_alert_levels,
+        )
+        if guidance:
+            analysis["llm_guidance"] = guidance
+        else:
+            analysis["llm_guidance"] = _fallback_log_rca_guidance(analysis)
+
+
+def _adjudicate_log_rca_with_llm(settings: Settings, question: str, analysis: dict[str, Any]) -> None:
+    review = adjudicate_rca_with_llm(
+        settings=settings,
+        question=question or str(analysis.get("summary") or ""),
+        analysis=analysis,
+    )
+    if review:
+        apply_llm_review(analysis, review)
+
+
+def _rca_needs_llm_guidance(analysis: dict[str, Any]) -> bool:
+    confidence = int(analysis.get("confidence") or 0)
+    return (
+        analysis.get("status") == "insufficient_data"
+        or confidence < 70
+        or analysis.get("incident_id") == "LOG-RCA-FOCUS-NOT-FOUND"
+    )
+
+
+def _fallback_log_rca_guidance(analysis: dict[str, Any]) -> str:
+    missing = analysis.get("missing_data") or []
+    missing_lines = "\n".join(f"- {item}" for item in list(missing)[:4])
+    if not missing_lines:
+        missing_lines = "- Timestamp-aligned application, OS, network, and dependency logs around the impact window."
+    return (
+        "## LLM guidance: RCA chưa đủ dữ liệu"
+        "\n- Kết luận: log hiện tại chưa đủ bằng chứng để xác nhận nguyên nhân gốc."
+        "\n- Vì sao chưa đủ: correlation hiện tại không có đủ event liên quan, timestamp hoặc dependency để kết luận chắc chắn."
+        "\n- Dữ liệu cần bổ sung:\n"
+        f"{missing_lines}"
+        "\n- Bước tiếp theo an toàn: mở rộng time window, thu thêm log/metrics theo component bị impact, kiểm tra change record và chạy lại RCA."
+    )
+
+
+def _events_for_rca_context(
+    settings: Settings,
+    lookback_hours: float,
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> list[LogEvent]:
+    raw_lines = list(iter_log_lines(settings.log_root_path))
+    events = parse_raw_lines(raw_lines)
+    if start_time is not None and end_time is not None:
+        return filter_events_by_time_range(events, start_time=start_time, end_time=end_time)
+    return filter_events_by_lookback(events, lookback_hours)
+
+
+def _analyze_logs_for_rca(
+    settings: Settings,
+    lookback_hours: float | None = None,
+    focus_text: str = "",
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> dict[str, Any]:
+    raw_lines = list(iter_log_lines(settings.log_root_path))
+    events = parse_raw_lines(raw_lines)
+    selected_lookback_hours = (
+        lookback_hours if lookback_hours is not None and lookback_hours > 0 else settings.report_lookback_hours
+    )
+    if start_time is not None and end_time is not None:
+        recent_events = filter_events_by_time_range(events, start_time=start_time, end_time=end_time)
+        window_label = format_time_range_label(start_time, end_time)
+    else:
+        recent_events = filter_events_by_lookback(events, selected_lookback_hours)
+        window_label = f"last {selected_lookback_hours:g}h"
+    return analyze_log_events(
+        recent_events,
+        lookback_hours=selected_lookback_hours,
+        alert_levels=settings.severity_alert_levels,
+        focus_text=focus_text,
+        window_label=window_label,
+    )
+
+
+def _events_from_generated_log_lines(generated: list[Any]) -> list[LogEvent]:
+    raw_lines = [
+        RawLogLine(
+            domain=str(item.domain),
+            source_file=item.path,
+            line_number=index,
+            text=str(item.text),
+        )
+        for index, item in enumerate(generated, start=1)
+    ]
+    return parse_raw_lines(raw_lines)
+
+
+def _payload_text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
 def _build_status(settings: Settings) -> dict[str, Any]:
     runtime_controls = RuntimeControlStore(settings.state_db_path).snapshot()
     workers = _worker_status_snapshot()
-    alert_metrics = _telegram_alert_metrics(settings)
     try:
         raw_lines = list(iter_log_lines(settings.log_root_path))
         events = parse_raw_lines(raw_lines)
     except FileNotFoundError as exc:
+        log_rca_analysis = analyze_log_events(
+            [],
+            lookback_hours=settings.report_lookback_hours,
+            alert_levels=settings.severity_alert_levels,
+        )
         return {
             "status": "degraded",
             "service": SERVICE_NAME,
@@ -320,7 +723,7 @@ def _build_status(settings: Settings) -> dict[str, Any]:
             "runtime_controls": runtime_controls,
             "workers": workers,
             "delivery": _delivery_status(settings, runtime_controls, workers),
-            "telegram_alert_metrics": alert_metrics,
+            "rca": _rca_status(settings, log_rca_analysis),
             "raw_lines": 0,
             "parsed_events": 0,
             "severity_counts": {},
@@ -329,6 +732,11 @@ def _build_status(settings: Settings) -> dict[str, Any]:
         }
 
     recent_events = filter_events_by_lookback(events, settings.report_lookback_hours)
+    log_rca_analysis = analyze_log_events(
+        recent_events,
+        lookback_hours=settings.report_lookback_hours,
+        alert_levels=settings.severity_alert_levels,
+    )
     alert_levels = set(settings.severity_alert_levels)
     alert_events = sorted(
         [event for event in recent_events if event.severity in alert_levels],
@@ -342,7 +750,7 @@ def _build_status(settings: Settings) -> dict[str, Any]:
         "runtime_controls": runtime_controls,
         "workers": workers,
         "delivery": _delivery_status(settings, runtime_controls, workers),
-        "telegram_alert_metrics": alert_metrics,
+        "rca": _rca_status(settings, log_rca_analysis),
         "raw_lines": len(raw_lines),
         "parsed_events": len(events),
         "report_window_events": len(recent_events),
@@ -361,7 +769,6 @@ def _safe_config(settings: Settings) -> dict[str, Any]:
         "report_time": settings.report_time,
         "report_lookback_hours": settings.report_lookback_hours,
         "scan_interval_seconds": settings.scan_interval_seconds,
-        "escalation_timeout_seconds": settings.escalation_timeout_seconds,
         "severity_alert_levels": list(settings.severity_alert_levels),
         "runtime_log_bootstrap_enabled": settings.runtime_log_bootstrap_enabled,
         "demo_log_bootstrap_count": settings.demo_log_bootstrap_count,
@@ -369,6 +776,8 @@ def _safe_config(settings: Settings) -> dict[str, Any]:
         "demo_log_interval_seconds": settings.demo_log_interval_seconds,
         "demo_log_domain": settings.demo_log_domain,
         "demo_log_severity": settings.demo_log_severity,
+        "incident_log_generator_enabled": settings.incident_log_generator_enabled,
+        "incident_log_interval_seconds": settings.incident_log_interval_seconds,
         "runtime_scheduler_enabled": settings.runtime_scheduler_enabled,
         "runtime_scheduler_dry_run": settings.runtime_scheduler_dry_run,
         "telegram_alerts_configured": _telegram_alerts_configured(settings),
@@ -451,93 +860,19 @@ def _has_real_secret(value: str) -> bool:
     }
 
 
-def _telegram_alert_metrics(settings: Settings) -> dict[str, Any]:
+def _rca_status(settings: Settings, log_rca_analysis: dict[str, Any]) -> dict[str, Any]:
     try:
-        store = AlertStore(settings.state_db_path)
-        window_starts = _telegram_metric_window_starts(settings.app_timezone)
-        windows = {
-            key: store.status_counts(since_ts=start_ts)
-            for key, start_ts in window_starts.items()
-        }
-        default_window = "today"
-        default_counts = windows[default_window]
-        return {
-            **default_counts,
-            "default_window": default_window,
-            "timezone": _metric_timezone_name(settings.app_timezone),
-            "windows": windows,
-            "window_starts": window_starts,
-            "generated_at_ts": int(time.time()),
-        }
+        latest = RcaIncidentStore(settings.state_db_path).latest()
     except Exception:
-        return {
-            "sent_total": 0,
-            "pending": 0,
-            "acknowledged": 0,
-            "escalated": 0,
-            "default_window": "today",
-            "timezone": _metric_timezone_name(settings.app_timezone),
-            "windows": {
-                "today": _zero_alert_counts(),
-                "24h": _zero_alert_counts(),
-                "7d": _zero_alert_counts(),
-                "all": _zero_alert_counts(),
-            },
-            "window_starts": {
-                "today": None,
-                "24h": None,
-                "7d": None,
-                "all": None,
-            },
-            "generated_at_ts": int(time.time()),
-        }
-
-
-def _telegram_metric_window_starts(app_timezone: str) -> dict[str, int | None]:
-    now_ts = int(time.time())
-    tz = _metric_timezone(app_timezone)
-    local_now = datetime.fromtimestamp(now_ts, tz)
-    today_start = int(
-        local_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    )
+        latest = None
+    analysis = latest.get("analysis", {}) if isinstance(latest, dict) else {}
     return {
-        "today": today_start,
-        "24h": now_ts - 24 * 60 * 60,
-        "7d": now_ts - 7 * 24 * 60 * 60,
-        "all": None,
-    }
-
-
-def _metric_timezone(app_timezone: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(app_timezone)
-    except ZoneInfoNotFoundError:
-        return ZoneInfo("UTC")
-
-
-def _metric_timezone_name(app_timezone: str) -> str:
-    try:
-        ZoneInfo(app_timezone)
-    except ZoneInfoNotFoundError:
-        return "UTC"
-    return app_timezone
-
-
-def _zero_alert_counts() -> dict[str, int]:
-    return {
-        "sent_total": 0,
-        "pending": 0,
-        "acknowledged": 0,
-        "escalated": 0,
-    }
-
-
-def _reset_telegram_alert_counters(settings: Settings) -> dict[str, Any]:
-    deleted_count = AlertStore(settings.state_db_path).reset_alerts()
-    return {
-        "status": "ok",
-        "deleted_count": deleted_count,
-        "telegram_alert_metrics": _telegram_alert_metrics(settings),
+        "available_scenarios": list_scenarios(),
+        "available_log_scenarios": list(INCIDENT_SCENARIOS),
+        "log_analysis": log_rca_compact(log_rca_analysis),
+        "latest_incident_id": analysis.get("incident_id"),
+        "latest_status": analysis.get("status"),
+        "latest_confidence": analysis.get("confidence"),
     }
 
 
@@ -659,6 +994,21 @@ def _start_background_workers(settings: Settings) -> None:
             flush=True,
         )
 
+    if settings.incident_log_generator_enabled:
+        thread = threading.Thread(
+            target=_run_incident_log_generator,
+            args=(settings,),
+            name="incident-log-generator",
+            daemon=True,
+        )
+        thread.start()
+        print(
+            "Incident log generator started: "
+            f"interval={settings.incident_log_interval_seconds}s "
+            f"scenarios={len(INCIDENT_SCENARIOS)}.",
+            flush=True,
+        )
+
     if settings.runtime_scheduler_enabled:
         thread = threading.Thread(
             target=_run_scheduler_background,
@@ -691,6 +1041,7 @@ def _start_background_workers(settings: Settings) -> None:
 
 
 def _run_demo_log_generator(settings: Settings) -> None:
+    _mark_worker("demo_log_generator", "running")
     control_store = RuntimeControlStore(settings.state_db_path)
     while True:
         interval_seconds = control_store.get_float_value(
@@ -722,6 +1073,49 @@ def _run_demo_log_generator(settings: Settings) -> None:
         time.sleep(max(interval_seconds, 1.0))
 
 
+def _generate_all_incident_log_scenarios(settings: Settings) -> dict[str, Any]:
+    scenario_counts: dict[str, int] = {}
+    generated_count = 0
+    for scenario in INCIDENT_SCENARIOS:
+        generated = generate_incident_log_lines(settings.log_root_path, scenario)
+        scenario_counts[scenario] = len(generated)
+        generated_count += len(generated)
+    return {
+        "scenario_count": len(scenario_counts),
+        "generated_count": generated_count,
+        "scenario_counts": scenario_counts,
+    }
+
+
+def _run_incident_log_generator(settings: Settings) -> None:
+    _mark_worker("incident_log_generator", "running")
+    control_store = RuntimeControlStore(settings.state_db_path)
+    while True:
+        interval_seconds = control_store.get_float_value(
+            VALUE_INCIDENT_LOG_INTERVAL_SECONDS,
+            settings.incident_log_interval_seconds,
+        )
+        pause_state = control_store.pause_state(CONTROL_INCIDENT_GENERATION)
+        if pause_state.paused:
+            print(
+                f"Incident log generator paused until {pause_state.paused_until:%Y-%m-%d %H:%M:%S}.",
+                flush=True,
+            )
+            time.sleep(max(min(interval_seconds, 30.0), 1.0))
+            continue
+
+        try:
+            result = _generate_all_incident_log_scenarios(settings)
+            print(
+                "Generated runtime incident log pack: "
+                f"{result['scenario_count']} scenarios, {result['generated_count']} log lines.",
+                flush=True,
+            )
+        except Exception:
+            traceback.print_exc()
+        time.sleep(max(interval_seconds, 1.0))
+
+
 def _run_scheduler_background(settings: Settings) -> None:
     _mark_worker("runtime_scheduler", "running")
     try:
@@ -729,7 +1123,6 @@ def _run_scheduler_background(settings: Settings) -> None:
             settings=settings,
             dry_run=settings.runtime_scheduler_dry_run,
             max_alerts=settings.runtime_scheduler_max_alerts,
-            max_escalations=settings.runtime_scheduler_max_escalations,
         )
     except Exception as exc:
         _mark_worker("runtime_scheduler", "stopped", f"{type(exc).__name__}: {exc}")

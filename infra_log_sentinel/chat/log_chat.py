@@ -10,7 +10,22 @@ from infra_log_sentinel.models import LogEvent
 
 
 SEVERITY_ORDER = {"critical": 0, "error": 1, "warning": 2, "info": 3}
-DOMAINS = ("network", "linux", "windows", "vmware")
+DOMAINS = (
+    "network",
+    "fortigate",
+    "juniper",
+    "aruba",
+    "linux",
+    "windows",
+    "vmware",
+    "checkmk",
+    "cacti",
+    "prometheus",
+    "grafana",
+    "elk",
+    "wazuh",
+    "syslog",
+)
 SEVERITIES = ("critical", "error", "warning", "info")
 
 
