@@ -82,11 +82,11 @@ Invoke-WebRequest `
 - Repository: `https://github.com/trangdm/infra-log-sentinel-agent`.
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`.
 - Hosted endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`.
-- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`.
-- Submitted runtime image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`.
-- Endpoint version: `38`.
+- Submitted runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`.
+- Submitted runtime image digest: `sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa`.
+- Endpoint version: `39`.
 - Runtime mode: `runtime_folder`, self-contained synthetic infrastructure log demo.
-- Verification on 2026-06-15: runtime `ACTIVE`, endpoint `ACTIVE`, replica count `1`, `/health` returned `ok`, `/status` returned `ok` in `runtime_folder` mode, hosted UI served the Log & RCA chat workspace with Recents chat history, Quick action and Quick impact dropdowns, RCA history showing Impact/symptom plus time, vertical RCA result blocks, Vietnamese RCA output, and command details in Action; RCA command/check questions now return runbook commands instead of full RCA reports; daily report scheduling uses `Asia/Ho_Chi_Minh`; local regression suite passed with `53 passed`.
+- Verification on 2026-06-16: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `39`, replica count `1`, `/health` returned `ok`, `/status` returned `ok` in `runtime_folder` mode, hosted UI served the Log & RCA chat workspace with Chat Agent Recents under Quick action, RCA Recent history inside the RCA tab, aligned Chat Agent/RCA side-panel spacing, vertical RCA result blocks, Vietnamese RCA output, and command details in Action; local regression suite passed with `53 passed`.
 
 For the copy-ready GreenNode submission packet, see `docs/submission.md`.
 

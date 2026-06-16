@@ -131,9 +131,9 @@ Completed:
 - Deployed GreenNode AgentBase runtime:
   - Runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
   - Endpoint: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
-  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`
-  - Image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`
-  - Endpoint version: `38`
+  - Image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`
+  - Image digest: `sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa`
+  - Endpoint version: `39`
   - Runtime status: `ACTIVE`
   - Endpoint status: `ACTIVE`
   - Current replicas: `1`
@@ -152,12 +152,12 @@ Completed:
   - Alert scan job exception isolation.
 - Telegram alerts are one-way notifications; ACK/escalation and alert counter cards are retired.
 
-Verified after v40 deployment on 2026-06-15:
+Verified after v41 deployment on 2026-06-16:
 
 - `GET /health` returned `ok`.
 - `GET /status` returned `ok` in `runtime_folder` mode.
 - Hosted RCA insufficient-data smoke returned `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, and `llm_guidance=true`.
-- Hosted UI serves the Log & RCA chat workspace with Recents chat history in the left panel, Quick action and Quick impact dropdowns, RCA history showing Impact/symptom plus time, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
+- Hosted UI serves the Log & RCA chat workspace with Chat Agent Recents under Quick action, Quick action and Quick impact dropdowns, RCA Recent history inside the RCA tab, aligned Chat Agent/RCA side-panel spacing, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
 - RCA chat intent routing distinguishes full RCA analysis requests from RCA command/check/runbook requests across all generated RCA cases; command/check questions return runbook commands instead of full RCA reports.
 - RCA output uses Vietnamese explanatory text while preserving log identifiers, event types, commands, and technical terms in English.
 - RCA Action includes detailed command cards for log inspection, service checks, and platform-specific validation.

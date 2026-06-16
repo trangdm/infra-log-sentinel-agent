@@ -3744,20 +3744,24 @@ CHAT_UI_HTML = r"""<!doctype html>
     }
 
     body[data-view="rca"] .insight-rail {
-      padding: 18px 30px;
-      overflow: auto;
+      padding: 0;
+      overflow: hidden;
     }
 
     body[data-view="rca"] #rail-panel-rca {
-      width: min(100%, 1180px);
-      display: block !important;
-      overflow: visible;
+      width: 100%;
+      display: grid !important;
+      grid-template-columns: 228px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      column-gap: 28px;
+      overflow: hidden;
     }
 
     body[data-view="rca"] .rca-workspace {
       min-height: calc(100vh - 36px);
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr);
+      margin: 18px 30px 18px 0;
       overflow: hidden;
     }
 
@@ -3886,7 +3890,11 @@ CHAT_UI_HTML = r"""<!doctype html>
     body[data-view="rca"] .rca-history-panel {
       display: grid;
       gap: 8px;
-      margin-top: 2px;
+      align-content: start;
+      min-width: 0;
+      margin: 0 0 0 30px;
+      padding: 18px 16px 0 0;
+      border-right: 1px solid #e3e8ef;
       overflow: hidden;
     }
 
@@ -4124,22 +4132,6 @@ CHAT_UI_HTML = r"""<!doctype html>
         </div>
       </section>
 
-      <section class="nav-panel chat-history-panel" aria-label="Chat history">
-        <div class="chat-history-head">
-          <strong>Recents</strong>
-          <small>Last 5 sessions</small>
-        </div>
-        <div id="chat-history-list" class="chat-history-list"></div>
-      </section>
-
-      <section class="nav-panel rca-history-panel" aria-label="RCA history">
-        <div class="chat-history-head">
-          <strong>RCA history</strong>
-          <small>Impact / symptom + time</small>
-        </div>
-        <div id="rca-history-list" class="chat-history-list"></div>
-      </section>
-
       <section class="nav-panel runtime-panel">
         <p class="nav-title">Runtime posture</p>
         <div class="runtime-state">
@@ -4208,6 +4200,13 @@ CHAT_UI_HTML = r"""<!doctype html>
       <section id="chat-quick-panel" class="chat-quick-panel" aria-label="Quick actions">
         <p class="chat-quick-title">Quick action</p>
         <div id="chat-quick-select-slot" class="chat-quick-select-slot"></div>
+        <section class="nav-panel chat-history-panel" aria-label="Chat history">
+          <div class="chat-history-head">
+            <strong>Recents</strong>
+            <small>Last 5 sessions</small>
+          </div>
+          <div id="chat-history-list" class="chat-history-list"></div>
+        </section>
       </section>
 
       <section id="view-dashboard" class="workspace-view dashboard-view" data-view-panel="dashboard">
@@ -4448,6 +4447,13 @@ CHAT_UI_HTML = r"""<!doctype html>
       </div>
 
       <div id="rail-panel-rca" class="rail-panel" role="tabpanel" data-rail-panel="rca" hidden>
+        <section class="nav-panel rca-history-panel" aria-label="RCA history">
+          <div class="chat-history-head">
+            <strong>Recent</strong>
+            <small>Impact / symptom + time</small>
+          </div>
+          <div id="rca-history-list" class="chat-history-list"></div>
+        </section>
         <section class="rca-workspace" aria-label="RCA workspace">
           <div class="rca-workspace-head">
             <div>

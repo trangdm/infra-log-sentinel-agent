@@ -1,6 +1,6 @@
 # GreenNode Submission Packet
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 
 ## Project
 
@@ -18,13 +18,13 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 
 ## Submission Form Answers
 
-- Team name: `TODO: fill registered team name`
+- Team name: `PENDING USER INPUT: fill registered team name`
 - Track: `Agentic Assistant` (recommended for the chat/RCA copilot positioning)
 - AgentBase project link / GitHub: `https://github.com/trangdm/infra-log-sentinel-agent`
 - Running AgentBase demo link: `https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn`
-- Demo video link: `TODO: add 2-3 minute YouTube or OneDrive link shared for VNG domain`
-- Department and members: `TODO: fill 1-3 member names and accdomain@vng.com.vn emails`
-- Team avatar: optional, square PNG/JPG at least 512x512 and under 5 MB
+- Demo video link: `PENDING USER INPUT: add 2-3 minute YouTube or OneDrive link shared for VNG domain`
+- Department and members: `PENDING USER INPUT: fill 1-3 member names and accdomain@vng.com.vn emails`
+- Team thumbnail: `PENDING USER INPUT: add representative JPG/PNG image for the voting page, ideally 16:9 and under 5 MB`
 
 Short use case description for the form:
 
@@ -35,9 +35,9 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 ## Runtime
 
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
-- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260615-rca-intent-history-v40`
-- Runtime image digest: `sha256:764901c2d2e51985a8634785b3edd91fa474d0b9e54fcab8edefc89ffb77fcbe`
-- Endpoint version: `38`
+- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`
+- Runtime image digest: `sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa`
+- Endpoint version: `39`
 - Runtime status: `ACTIVE`
 - Endpoint status: `ACTIVE`
 - Current replicas: `1`
@@ -60,7 +60,7 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 6. Use the RCA workspace:
    - Enter an impact/symptom.
    - Choose a lookback window.
-   - Analyze current logs or generate a correlated incident first.
+   - Analyze current logs; use Runtime Controls to generate incident logs when a fresh demo scenario is needed.
 7. Trigger or wait for realtime Telegram alerts as one-way operational notifications.
 
 ## Key Capabilities
@@ -77,13 +77,13 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 
 ## Verification
 
-Verified after deploying v40 on 2026-06-15:
+Verified after deploying v41 on 2026-06-16:
 
 - `/health`: `ok`
 - `/status`: `ok`, runtime mode `runtime_folder`
 - Hosted RCA insufficient-data smoke: `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, `llm_guidance=true`
-- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `38`, replica count `1`
-- Hosted UI: Chat Agent shows `Infrastructure Log & RCA Intelligence`, Recents chat history in the left panel, Quick action and Quick impact dropdowns, RCA history in the left panel showing Impact/symptom plus time, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
+- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `39`, replica count `1`
+- Hosted UI: Chat Agent shows `Infrastructure Log & RCA Intelligence`, Recents chat history under Quick action, Quick action and Quick impact dropdowns, RCA Recent history inside the RCA tab showing Impact/symptom plus time, aligned Chat Agent/RCA side-panel spacing, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
 - RCA chat intent routing: full RCA analysis requests still return RCA reports, while RCA command/check/runbook requests return relevant runbook commands across all generated RCA scenarios.
 - RCA output uses Vietnamese explanatory text while preserving log identifiers, event types, commands, and technical terms in English.
 - RCA Action includes detailed command cards for log inspection, service checks, and platform-specific validation.
@@ -94,7 +94,16 @@ Verified after deploying v40 on 2026-06-15:
 - RCA workspace no longer occupies chat conversation space
 - UI exposes `New chat` context reset and RCA workspace `Clear`
 - Runtime RCA/chat smoke: compact RCA brief with 11 RCA answers, no duplicated legacy RCA sections
-- Core regression tests: `51 passed`
+- Core regression tests: `53 passed`
+
+## Pass / Fail Readiness
+
+- AgentBase runtime deployed and accessible: PASS.
+- At least one successful hosted request: PASS (`/health`, `/status`, and hosted UI smoke were verified).
+- README/use case description present: PASS.
+- Demo video 2-3 minutes and accessible by VNG account: PENDING USER INPUT.
+- Team name, department, and member emails: PENDING USER INPUT.
+- Team thumbnail image for the submission form: PENDING USER INPUT.
 
 ## Security Notes
 
