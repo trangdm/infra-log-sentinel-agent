@@ -1,6 +1,6 @@
 # Session Progress
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 
 ## Project
 
@@ -80,7 +80,31 @@ Runtime status: ACTIVE
 Endpoint status: ACTIVE
 Current replicas: 1
 Submission packet: docs/submission.md
+Git commit: bc73b93
 ```
+
+## Resume Checkpoint 2026-06-16
+
+User paused the session after preparing the GreenNode submission.
+
+Done:
+
+- Runtime v41 is deployed and smoke-tested on AgentBase.
+- Hosted endpoint health/status are OK in `runtime_folder` mode.
+- Hosted UI contains Chat Agent Recents under Quick action and RCA Recent history inside the RCA tab.
+- Full regression suite passed: `53 passed, 1 warning`.
+- Image pushed: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`.
+- GitHub `origin/main` was pushed with commit `bc73b93` (`Prepare GreenNode submission v41`).
+- Copy-ready submission packet is in `docs/submission.md`.
+
+Pending user-owned submission fields:
+
+- Registered team name.
+- Department, member names, and `accdomain@vng.com.vn` emails.
+- 2-3 minute demo video link, shared so VNG account can access it.
+- Team thumbnail image for the GreenNode form.
+
+When recalled, continue from the submission packet. Re-check hosted `/health`, `/status`, endpoint version, and Git status before any final submission help.
 
 Working commands:
 
