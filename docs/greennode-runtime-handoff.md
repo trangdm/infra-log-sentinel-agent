@@ -12,16 +12,16 @@ Greennode fixed the overloaded runtime infrastructure. The main hosted runtime w
 Runtime ID:      runtime-a864917b-1a16-4083-a64c-82f4e79f6602
 Endpoint ID:     endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9
 Endpoint:        https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
-Image:           vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41
-Image digest:    sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa
-Endpoint version: 39
+Image:           vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-natural-chat-v42
+Image digest:    sha256:17b70718f89cb1813867de85a3494ee7d3e00eb7f64dbcdc181a5b517a6cd33f
+Endpoint version: 40
 Runtime status:  ACTIVE
 Endpoint status: ACTIVE
 Replicas:        1
 Health:          ok
 ```
 
-Hosted UI smoke confirmed the Log & RCA chat workspace with Chat Agent Recents under Quick action, Quick action and Quick impact dropdowns, RCA Recent history inside the RCA tab showing Impact/symptom plus time, aligned Chat Agent/RCA side-panel spacing, vertical RCA result blocks, Vietnamese RCA explanations, Action command cards, and timezone-labeled report time.
+Hosted UI smoke confirmed the Log & RCA chat workspace with Chat Agent Recents under Quick action, Quick action and Quick impact dropdowns, RCA Recent history inside the RCA tab showing Impact/symptom plus time, aligned Chat Agent/RCA side-panel spacing, vertical RCA result blocks, Vietnamese RCA explanations, Action command cards, timezone-labeled report time, and natural conversation/out-of-scope chat handling.
 
 ## Current Code State
 

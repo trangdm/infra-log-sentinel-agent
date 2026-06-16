@@ -8,7 +8,9 @@ from infra_log_sentinel.chat.actions import try_execute_chat_action
 from infra_log_sentinel.chat.intent import (
     INTENT_AMBIGUOUS_OPERATIONAL_CHANGE,
     INTENT_ASSISTANT_FEEDBACK,
+    INTENT_CONVERSATION,
     INTENT_LOG_QUESTION,
+    INTENT_OUT_OF_SCOPE,
     INTENT_SAFE_ACTION,
     classify_chat_intent,
     normalize_text,
@@ -191,6 +193,22 @@ def test_intent_router_separates_log_questions_from_actions() -> None:
     assert correction.rules_first is False
 
 
+def test_intent_router_recognizes_natural_and_out_of_scope_questions() -> None:
+    greeting = classify_chat_intent("xin chao")
+    identity = classify_chat_intent("ban la ai va ban giup duoc gi?")
+    weather = classify_chat_intent("thoi tiet hom nay the nao?")
+    mixed_log = classify_chat_intent("xin chao, tom tat log hom nay")
+
+    assert greeting.kind == INTENT_CONVERSATION
+    assert greeting.action_candidate is False
+    assert greeting.rules_first is False
+    assert identity.kind == INTENT_CONVERSATION
+    assert weather.kind == INTENT_OUT_OF_SCOPE
+    assert weather.action_candidate is False
+    assert weather.rules_first is False
+    assert mixed_log.kind == INTENT_LOG_QUESTION
+
+
 def test_action_layer_rejects_log_summary_and_user_corrections(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
 
@@ -209,6 +227,51 @@ def test_action_layer_rejects_log_summary_and_user_corrections(tmp_path: Path) -
 
     assert summary.handled is False
     assert correction.handled is False
+
+
+def test_natural_conversation_does_not_enter_log_action_or_llm(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+    log_file = settings.log_root_path / "linux" / "dynamic-linux.log"
+    log_file.write_text(
+        (
+            "Jun 12 10:00:00 linux-web01.example.local sshd[1842]: "
+            "Failed password for invalid user admin from 203.0.113.79 port 51520 ssh2\n"
+        ),
+        encoding="utf-8",
+    )
+
+    def fail_unexpected_path(*args, **kwargs):
+        raise AssertionError("natural conversation should not enter log/action/LLM path")
+
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.answer_with_llm", fail_unexpected_path)
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.try_execute_chat_action", fail_unexpected_path)
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.answer_log_question", fail_unexpected_path)
+
+    answer = answer_or_execute_chat(settings, "xin chao", dry_run=False)
+
+    normalized = normalize_text(answer)
+    assert "xin chao" in normalized
+    assert "tom tat log hom nay" in normalized
+    assert "Failed password" not in answer
+
+
+def test_out_of_scope_question_answers_in_context_without_llm(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _prepare_runtime_storage(settings)
+
+    def fail_unexpected_path(*args, **kwargs):
+        raise AssertionError("out-of-scope question should not enter action or LLM path")
+
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.answer_with_llm", fail_unexpected_path)
+    monkeypatch.setattr("infra_log_sentinel.chat.responder.try_execute_chat_action", fail_unexpected_path)
+
+    answer = answer_or_execute_chat(settings, "thoi tiet hom nay the nao?", dry_run=False)
+
+    normalized = normalize_text(answer)
+    assert "thoi tiet" in normalized
+    assert "khong phai du lieu log" in normalized
+    assert "runtime" in normalized
 
 
 def test_feedback_question_does_not_dump_warning_logs(tmp_path: Path, monkeypatch) -> None:

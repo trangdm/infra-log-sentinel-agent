@@ -16,7 +16,7 @@ Use case:
 - Send one-way Telegram alert notifications for warning/error/critical events.
 - Provide an RCA workspace for impact/window/scenario-driven diagnosis.
 
-Current note: ACK/escalation and Telegram alert counters were retired in v20. v21 moved RCA into a dedicated right-panel tab and added MiniMax next-step guidance when log evidence is insufficient. v22 expands the log generator/parser to Fortigate, Juniper, Aruba, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style sources. v23 compacts RCA chat answers, adds explicit New chat context reset, and adds RCA workspace Clear. v24 adds an all-scenario incident log generator runtime control and removes scenario generation from the RCA panel. v25 makes RCA current-log search focus-aware so user symptoms such as Fortigate session spike are prioritized over unrelated critical events. v26 keeps the RCA workspace's latest focused result in browser state so background status refreshes cannot overwrite it. v41 is deployed on the main runtime with RCA intent routing, the desktop dashboard-style UI, Chat Agent Recents under Quick action, RCA Recent history inside the RCA tab, aligned Chat Agent/RCA side-panel spacing, vertical RCA result blocks, Vietnamese RCA explanations, command details in Action, editable report time, editable scan interval, and timezone-correct daily report scheduling. Older entries below are historical progress notes, not current product scope.
+Current note: ACK/escalation and Telegram alert counters were retired in v20. v21 moved RCA into a dedicated right-panel tab and added MiniMax next-step guidance when log evidence is insufficient. v22 expands the log generator/parser to Fortigate, Juniper, Aruba, CheckMK, Cacti, Prometheus, Grafana, ELK, Wazuh, and syslog-style sources. v23 compacts RCA chat answers, adds explicit New chat context reset, and adds RCA workspace Clear. v24 adds an all-scenario incident log generator runtime control and removes scenario generation from the RCA panel. v25 makes RCA current-log search focus-aware so user symptoms such as Fortigate session spike are prioritized over unrelated critical events. v26 keeps the RCA workspace's latest focused result in browser state so background status refreshes cannot overwrite it. v42 is deployed on the main runtime with RCA intent routing, natural conversation/out-of-scope answers, the desktop dashboard-style UI, Chat Agent Recents under Quick action, RCA Recent history inside the RCA tab, aligned Chat Agent/RCA side-panel spacing, vertical RCA result blocks, Vietnamese RCA explanations, command details in Action, editable report time, editable scan interval, and timezone-correct daily report scheduling. Older entries below are historical progress notes, not current product scope.
 
 ## Workspace
 
@@ -73,14 +73,14 @@ Final hosted runtime:
 ```text
 Runtime ID: runtime-a864917b-1a16-4083-a64c-82f4e79f6602
 Endpoint: https://endpoint-c42c8f0b-6d74-42d5-9d6d-9fc7ce6b49e9.agentbase-runtime.aiplatform.vngcloud.vn
-Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41
-Image digest: sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa
-Endpoint version: 39
+Image: vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-natural-chat-v42
+Image digest: sha256:17b70718f89cb1813867de85a3494ee7d3e00eb7f64dbcdc181a5b517a6cd33f
+Endpoint version: 40
 Runtime status: ACTIVE
 Endpoint status: ACTIVE
 Current replicas: 1
 Submission packet: docs/submission.md
-Git commit: bc73b93
+Git commit: current `origin/main` v42 commit
 ```
 
 ## Resume Checkpoint 2026-06-16
@@ -89,12 +89,13 @@ User paused the session after preparing the GreenNode submission.
 
 Done:
 
-- Runtime v41 is deployed and smoke-tested on AgentBase.
+- Runtime v42 is deployed and smoke-tested on AgentBase.
 - Hosted endpoint health/status are OK in `runtime_folder` mode.
 - Hosted UI contains Chat Agent Recents under Quick action and RCA Recent history inside the RCA tab.
-- Full regression suite passed: `53 passed, 1 warning`.
-- Image pushed: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`.
-- GitHub `origin/main` was pushed with commit `bc73b93` (`Prepare GreenNode submission v41`).
+- Hosted natural chat smoke confirms `xin chao` and `thoi tiet hom nay the nao?` are answered safely.
+- Full regression suite passed: `56 passed, 1 warning`.
+- Image pushed: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-natural-chat-v42`.
+- GitHub `origin/main` should contain the v42 natural chat work after this checkpoint is pushed.
 - Copy-ready submission packet is in `docs/submission.md`.
 
 Pending user-owned submission fields:

@@ -7,7 +7,9 @@ import re
 from infra_log_sentinel.chat.intent import (
     INTENT_AMBIGUOUS_OPERATIONAL_CHANGE,
     INTENT_ASSISTANT_FEEDBACK,
+    INTENT_CONVERSATION,
     INTENT_LOG_QUESTION,
+    INTENT_OUT_OF_SCOPE,
     INTENT_SAFE_ACTION,
     classify_chat_intent,
 )
@@ -33,6 +35,8 @@ INTENT_BADGE = {
     INTENT_SAFE_ACTION: "⚙️ Action",
     INTENT_AMBIGUOUS_OPERATIONAL_CHANGE: "🛡️ Needs Clarity",
     INTENT_ASSISTANT_FEEDBACK: "💬 Conversation",
+    INTENT_CONVERSATION: "Conversation",
+    INTENT_OUT_OF_SCOPE: "Assistant",
 }
 
 

@@ -9,6 +9,8 @@ INTENT_LOG_QUESTION = "log_question"
 INTENT_SAFE_ACTION = "safe_action"
 INTENT_AMBIGUOUS_OPERATIONAL_CHANGE = "ambiguous_operational_change"
 INTENT_ASSISTANT_FEEDBACK = "assistant_feedback"
+INTENT_CONVERSATION = "conversation"
+INTENT_OUT_OF_SCOPE = "out_of_scope"
 INTENT_GENERAL_QUESTION = "general_question"
 
 DOMAINS = (
@@ -166,6 +168,22 @@ def classify_chat_intent(question: str) -> ChatIntent:
             reason="change-like operational request without enough target context",
         )
 
+    if _looks_like_conversation(q):
+        return ChatIntent(
+            kind=INTENT_CONVERSATION,
+            action_candidate=False,
+            rules_first=False,
+            reason="natural conversation without operational scope",
+        )
+
+    if _looks_like_out_of_scope_question(q):
+        return ChatIntent(
+            kind=INTENT_OUT_OF_SCOPE,
+            action_candidate=False,
+            rules_first=False,
+            reason="question is outside log, RCA, report, or runtime scope",
+        )
+
     return ChatIntent(
         kind=INTENT_GENERAL_QUESTION,
         action_candidate=False,
@@ -260,3 +278,83 @@ def _looks_like_log_question(q: str) -> bool:
 
 def _looks_like_ambiguous_operational_change(q: str) -> bool:
     return has_any_term(q, CHANGE_TERMS) and has_any_term(q, OPERATIONAL_TARGET_TERMS)
+
+
+def _looks_like_conversation(q: str) -> bool:
+    if _has_supported_runtime_scope(q):
+        return False
+    return has_any_term(
+        q,
+        (
+            "xin chao",
+            "chao",
+            "hello",
+            "hi",
+            "hey",
+            "alo",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "cam on",
+            "thanks",
+            "thank you",
+            "ok",
+            "oke",
+            "ban la ai",
+            "may la ai",
+            "bot la ai",
+            "ban lam duoc gi",
+            "ban giup duoc gi",
+            "help",
+            "tro giup",
+            "ban khoe khong",
+        ),
+    )
+
+
+def _looks_like_out_of_scope_question(q: str) -> bool:
+    if _has_supported_runtime_scope(q):
+        return False
+    return (
+        "?" in q
+        or has_any_term(
+            q,
+            (
+                "thoi tiet",
+                "weather",
+                "tin tuc",
+                "news",
+                "gia vang",
+                "chung khoan",
+                "stock",
+                "bitcoin",
+                "btc",
+                "bong da",
+                "football",
+                "nau an",
+                "mon an",
+                "lich su",
+                "translate",
+                "dich",
+                "ai la",
+                "cai gi",
+                "la gi",
+                "tai sao",
+                "vi sao",
+                "the nao",
+                "o dau",
+                "khi nao",
+                "bao nhieu",
+            ),
+        )
+    )
+
+
+def _has_supported_runtime_scope(q: str) -> bool:
+    return (
+        has_any_term(q, ("log", "alert", "event", "rca", "root cause", "runbook"))
+        or has_any_term(q, DOMAINS)
+        or has_any_term(q, SEVERITIES)
+        or has_any_term(q, OPERATIONAL_TARGET_TERMS)
+        or has_any_term(q, RUNBOOK_TERMS)
+    )

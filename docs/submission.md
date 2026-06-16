@@ -35,9 +35,9 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 ## Runtime
 
 - GreenNode AgentBase runtime ID: `runtime-a864917b-1a16-4083-a64c-82f4e79f6602`
-- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-ui-history-layout-v41`
-- Runtime image digest: `sha256:279134c8fc3d7c521e16e36cc78df56b0c2e586cd5330b50535cbfd2c9276ffa`
-- Endpoint version: `39`
+- Runtime image: `vcr.vngcloud.vn/111480-abp111815/infra-log-sentinel-agent:v20260616-natural-chat-v42`
+- Runtime image digest: `sha256:17b70718f89cb1813867de85a3494ee7d3e00eb7f64dbcdc181a5b517a6cd33f`
+- Endpoint version: `40`
 - Runtime status: `ACTIVE`
 - Endpoint status: `ACTIVE`
 - Current replicas: `1`
@@ -77,13 +77,14 @@ Infrastructure Log Sentinel Agent is an AI operations copilot for infrastructure
 
 ## Verification
 
-Verified after deploying v41 on 2026-06-16:
+Verified after deploying v42 on 2026-06-16:
 
 - `/health`: `ok`
 - `/status`: `ok`, runtime mode `runtime_folder`
 - Hosted RCA insufficient-data smoke: `LOG-RCA-FOCUS-NOT-FOUND`, `insufficient_data`, `llm_guidance=true`
-- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `39`, replica count `1`
+- Runtime control-plane status: runtime `ACTIVE`, endpoint `ACTIVE`, endpoint version `40`, replica count `1`
 - Hosted UI: Chat Agent shows `Infrastructure Log & RCA Intelligence`, Recents chat history under Quick action, Quick action and Quick impact dropdowns, RCA Recent history inside the RCA tab showing Impact/symptom plus time, aligned Chat Agent/RCA side-panel spacing, editable report time, editable scan interval, and vertical RCA result blocks: Most Likely Root Cause, Evidence, Analyze, Action.
+- Hosted natural chat smoke: `xin chao` returns a natural greeting and `thoi tiet hom nay the nao?` is answered as out-of-scope without log dumps, runtime actions, or unverified web assumptions.
 - RCA chat intent routing: full RCA analysis requests still return RCA reports, while RCA command/check/runbook requests return relevant runbook commands across all generated RCA scenarios.
 - RCA output uses Vietnamese explanatory text while preserving log identifiers, event types, commands, and technical terms in English.
 - RCA Action includes detailed command cards for log inspection, service checks, and platform-specific validation.
@@ -94,7 +95,7 @@ Verified after deploying v41 on 2026-06-16:
 - RCA workspace no longer occupies chat conversation space
 - UI exposes `New chat` context reset and RCA workspace `Clear`
 - Runtime RCA/chat smoke: compact RCA brief with 11 RCA answers, no duplicated legacy RCA sections
-- Core regression tests: `53 passed`
+- Core regression tests: `56 passed`
 
 ## Pass / Fail Readiness
 

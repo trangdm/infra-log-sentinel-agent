@@ -14,7 +14,9 @@ from infra_log_sentinel.chat.actions import try_execute_chat_action
 from infra_log_sentinel.chat.conversation import ConversationSnapshot, ConversationStore
 from infra_log_sentinel.chat.intent import (
     INTENT_ASSISTANT_FEEDBACK,
+    INTENT_CONVERSATION,
     INTENT_GENERAL_QUESTION,
+    INTENT_OUT_OF_SCOPE,
     classify_chat_intent,
     normalize_text,
 )
@@ -82,6 +84,24 @@ def answer_or_execute_chat(
             channel=conversation_channel,
             question=question,
             answer=_answer_assistant_feedback(),
+            intent=intent.kind,
+        )
+
+    if intent.kind == INTENT_CONVERSATION:
+        return _remember_and_return(
+            conversation_store=conversation_store,
+            channel=conversation_channel,
+            question=question,
+            answer=_answer_conversation(question),
+            intent=intent.kind,
+        )
+
+    if intent.kind == INTENT_OUT_OF_SCOPE:
+        return _remember_and_return(
+            conversation_store=conversation_store,
+            channel=conversation_channel,
+            question=question,
+            answer=_answer_out_of_scope(question),
             intent=intent.kind,
         )
 
@@ -955,6 +975,65 @@ def _answer_assistant_feedback() -> str:
         "- Nếu bạn đang hỏi hoặc góp ý với bot, mình trả lời trực tiếp vào ý đó.\n"
         "- Nếu câu có thể hiểu theo nhiều hướng, mình hỏi lại trước thay vì tự suy diễn.\n\n"
         "Bạn có thể hỏi lại câu muốn mình trả lời; mình sẽ không tự động xuất danh sách warning từ câu phản hồi này."
+    )
+
+
+def _answer_conversation(question: str) -> str:
+    q = normalize_text(question)
+    if any(term in q for term in ("cam on", "thanks", "thank you")):
+        return (
+            "Rất vui được hỗ trợ anh. Khi cần, anh cứ gửi câu hỏi log, mô tả impact để RCA, "
+            "hoặc hỏi command kiểm tra; mình sẽ giữ câu trả lời gọn và đúng ngữ cảnh vận hành."
+        )
+    if any(
+        term in q
+        for term in (
+            "ban la ai",
+            "may la ai",
+            "bot la ai",
+            "ban lam duoc gi",
+            "ban giup duoc gi",
+            "help",
+            "tro giup",
+        )
+    ):
+        return (
+            "Mình là Infra Log Sentinel Agent, trợ lý vận hành cho log hạ tầng và RCA. "
+            "Mình có thể tóm tắt log, phân tích root cause, đề xuất runbook command, tạo report, "
+            "và điều khiển một số runtime controls an toàn. Ví dụ: `tóm tắt log hôm nay`, "
+            "`command xử lý vmware warning`, hoặc `phân tích RCA Fortigate latency tăng trong 1 giờ qua`."
+        )
+    if any(term in q for term in ("ban khoe khong", "hom nay the nao")):
+        return (
+            "Mình ổn và sẵn sàng trực ca cùng anh. Nếu muốn bắt đầu nhẹ, anh có thể hỏi "
+            "`tóm tắt log hôm nay`; nếu đang có sự cố, gửi impact/symptom để mình chạy RCA theo ngữ cảnh."
+        )
+    return (
+        "Xin chào, mình đây. Mình sẽ trả lời tự nhiên khi anh trò chuyện, và chỉ phân tích log/RCA "
+        "khi câu hỏi có ngữ cảnh vận hành rõ ràng. Anh có thể bắt đầu bằng `tóm tắt log hôm nay` "
+        "hoặc mô tả sự cố cần điều tra."
+    )
+
+
+def _answer_out_of_scope(question: str) -> str:
+    q = normalize_text(question)
+    if any(term in q for term in ("thoi tiet", "weather")):
+        topic = "thời tiết"
+    elif any(term in q for term in ("tin tuc", "news")):
+        topic = "tin tức"
+    elif any(term in q for term in ("gia vang", "chung khoan", "stock", "bitcoin", "btc")):
+        topic = "thị trường/tài chính"
+    elif any(term in q for term in ("bong da", "football")):
+        topic = "thể thao"
+    else:
+        topic = "nội dung ngoài phạm vi log/RCA"
+    return (
+        f"Mình hiểu câu hỏi này đang nghiêng về {topic}, không phải dữ liệu log, RCA, runbook, "
+        "report hay runtime control của hệ thống. Runtime này không có nguồn dữ liệu ngoài như web, "
+        "thời tiết, tin tức hoặc dữ liệu thị trường để xác minh an toàn.\n\n"
+        "Trong ngữ cảnh Infra Log Sentinel, mình có thể giúp tốt nhất nếu anh gửi log, impact/symptom, "
+        "time window, hoặc hỏi command kiểm tra hạ tầng. Nếu câu hỏi thực ra liên quan vận hành, "
+        "anh mô tả thêm hệ thống/source bị ảnh hưởng là mình sẽ bám theo đó."
     )
 
 
